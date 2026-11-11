@@ -187,34 +187,37 @@ test("2. asking for the pickup time cites the booking", async ({ page }) => {
   await expect(page.getByTestId("step-chip").first()).toContainText("get_itinerary");
 });
 
-test("3. extend the stay → review card → Decline → booking unchanged", async ({ page }) => {
-  await loginAs(page, "traveller", `/trips/${REF}/chat`);
+test("3. a quote from the gate can be declined and the booking stays unchanged", async ({ page }) => {
+  await loginAs(page, "traveller", `/trips/${REF}`);
   const before = await booking(page);
-  const card = await askForCard(page, "Please extend my stay by 1 night");
-  await expect(card.getByTestId("review-notice")).toHaveText("Nothing is booked until you tap Confirm.");
-  await card.getByTestId("decline-btn").click();
-  await expect(card).toHaveAttribute("data-state", "declined");
+  // the gate's sample-inventory quote path (kept for API clients); chat no longer offers it for stays or flights
+  const q = await page.request.post("/api/mock/v1/quotes", { data: { bookingRef: REF, kind: "hotel_extend", params: { extraNights: 1 } } });
+  expect(q.status()).toBe(200);
+  const card = await q.json();
+  expect(card.notice).toBe("Nothing is booked until you tap Confirm.");
+  const dec = await page.request.post("/api/confirmations/decline", { data: { quoteId: card.quoteId } });
+  expect(dec.ok()).toBeTruthy();
   const after = await booking(page);
   expect(after.booking.totalInr).toBe(before.booking.totalInr);
   expect(after.booking.packVersion).toBe(before.booking.packVersion);
   expect(after.items.length).toBe(before.items.length);
 });
 
-test("4. price move: 409 → new review card → Confirm → receipt → pack version +1", async ({ page }) => {
-  await loginAs(page, "traveller", `/trips/${REF}/chat`);
+test("4. price move: 409 → new quote at the new price → Confirm → receipt → pack version +1", async ({ page }) => {
+  await loginAs(page, "traveller", `/trips/${REF}`);
   const before = await booking(page);
-  await page.getByLabel(/Demo: move the price/).check();
-  const first = await askForCard(page, "Please extend my stay by 1 night");
-  const firstPrice = await first.getByTestId("price-delta").innerText();
-  const firstQuote = await first.getAttribute("data-quote");
-  await first.getByTestId("confirm-btn").click();
-  await expect(page.getByText("The price moved from")).toBeVisible();
-  await expect(page.locator(`[data-quote="${firstQuote}"]`)).toHaveAttribute("data-state", "repriced");
-  const second = page.getByTestId("review-card").last();
-  expect(await second.getByTestId("price-delta").innerText()).not.toBe(firstPrice);
-  await second.getByTestId("confirm-btn").click();
-  await expect(page.getByTestId("receipt-card")).toBeVisible();
-  await expect(page.getByTestId("receipt-card")).toContainText("Offline guide updated");
+  const q = await page.request.post("/api/mock/v1/quotes?chaos=price_move", { data: { bookingRef: REF, kind: "hotel_extend", params: { extraNights: 1 } } });
+  const first = await q.json();
+  const { token } = await (await page.request.post("/api/confirmations", { data: { quoteId: first.quoteId } })).json();
+  const moved = await page.request.post("/api/mock/v1/changes/apply", { data: { quoteId: first.quoteId, token } });
+  expect(moved.status()).toBe(409);
+  const body = await moved.json();
+  expect(body.error).toBe("PRICE_CHANGED");
+  const second = body.newQuote as { quoteId: string; priceDeltaInr: number };
+  expect(second.priceDeltaInr).not.toBe(first.priceDeltaInr);
+  const { token: t2 } = await (await page.request.post("/api/confirmations", { data: { quoteId: second.quoteId } })).json();
+  const ok = await page.request.post("/api/mock/v1/changes/apply", { data: { quoteId: second.quoteId, token: t2 } });
+  expect(ok.status()).toBe(200);
   const after = await booking(page);
   expect(after.booking.packVersion).toBe(before.booking.packVersion + 1);
   expect(after.booking.totalInr).toBeGreaterThan(before.booking.totalInr);
@@ -374,4 +377,25 @@ test("10. signed-in travel user sees Home (the trip catalogue); an agent is sent
   await expect(page.getByTestId("hero-login-traveller")).toBeVisible({ timeout: 20_000 }); // back on the landing story
   await loginAs(page, "agent", "/");
   await expect(page).toHaveURL(/\/agent$/);
+});
+
+test("11. hotel change: the agent sends you to your platform, you record the booking, review it and Confirm", async ({ page }) => {
+  await loginAs(page, "traveller", `/trips/${REF}/chat`);
+  await expect(page.getByTestId("chat-log")).toBeVisible();
+  await ask(page, "Please extend my stay by 2 nights");
+  const hc = page.getByTestId("hotels-card").last();
+  await expect(hc).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("assistant-text").last()).toContainText("never see your password");
+  await expect(hc.getByTestId("hotel-platform-open")).toHaveCount(4);
+  expect(await hc.getByTestId("hotel-platform-open").first().getAttribute("href")).toMatch(/^https:\/\//);
+  await expect(hc).toContainText("cannot compare prices"); // no live hotel price source in this environment: it says so, no invented prices
+  await hc.getByTestId("hf-amount").fill("9800");
+  await hc.getByTestId("hf-submit").click();
+  const card = page.getByTestId("review-card").last();
+  await expect(card).toContainText("Record your stay change");
+  await expect(card.getByTestId("review-notice")).toContainText("books and charges nothing");
+  await expect(card.getByTestId("price-delta")).toContainText("9,800");
+  await card.getByTestId("confirm-btn").click();
+  await expect(page.getByTestId("receipt-card").last()).toContainText("you paid on the platform");
+  await expect(page.getByTestId("guide-update").last()).toContainText("Offline guide updated to version");
 });

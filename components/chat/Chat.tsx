@@ -12,6 +12,7 @@ import { OfflineAnswer } from "./OfflineAnswer";
 import { ReviewCardView, type Review, type ReviewState } from "./ReviewCard";
 import { PlatformCard, type PlatformsPart } from "./PlatformCard";
 import { CompareCard, type ComparePart } from "./CompareCard";
+import { HotelCard, type HotelsPart } from "./HotelCard";
 
 type Step = { id: string; name: string; status: "running" | "done" | "error" };
 type Receipt = { kind?: string; receiptId: string; summary: string; priceDeltaInr: number; newTotalInr: number; packVersion: number; bookingRef: string; guide?: { updated: boolean; regenerated: string[]; origin?: string; message: string } };
@@ -22,11 +23,12 @@ type Part =
   | { t: "receipt"; receipt: Receipt }
   | PlatformsPart
   | ComparePart
+  | HotelsPart
   | { t: "oa"; answer: OaAnswer; question: string; userId: string; queued?: boolean };
 type Msg = { id: string; role: "user" | "assistant"; text: string; steps: Step[]; parts: Part[]; queued?: boolean; label?: string; ms?: number };
 
 const DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
-const PROMPTS = ["When is my pickup?", "Change my flight", "Extend my stay in Rome by 1 night", "How do I get from my hotel to the Colosseum?"];
+const PROMPTS = ["When is my pickup?", "Change my flight", "Change my hotel stay", "How do I get from my hotel to the Colosseum?"];
 let uid = 0;
 const nid = () => `m${++uid}-${Date.now()}`;
 
@@ -104,7 +106,7 @@ export function Chat() {
           else if (e.t === "step") patch((m) => ({ ...m, steps: m.steps.some((s) => s.id === e.id) ? m.steps.map((s) => (s.id === e.id ? { ...s, status: e.status } : s)) : [...m.steps, { id: e.id, name: e.name, status: e.status }] }));
           else if (e.t === "text") patch((m) => ({ ...m, text: m.text + e.delta }));
           else if (e.t === "review") { setStates((s) => ({ ...s, [e.card.quoteId]: { s: "idle" } })); patch((m) => ({ ...m, parts: [...m.parts, e] })); }
-          else if (e.t === "case" || e.t === "route" || e.t === "receipt" || e.t === "platforms" || e.t === "compare") patch((m) => ({ ...m, parts: [...m.parts, e] }));
+          else if (e.t === "case" || e.t === "route" || e.t === "receipt" || e.t === "platforms" || e.t === "compare" || e.t === "hotels") patch((m) => ({ ...m, parts: [...m.parts, e] }));
           else if (e.t === "done") patch((m) => ({ ...m, label: e.label, ms: e.ms }));
           else if (e.t === "error") patch((m) => ({ ...m, text: m.text || e.message }));
         }
@@ -265,11 +267,12 @@ function PartView({ p, states, onConfirm, onDecline, refCode, online, onReview, 
         <div className="flex items-center justify-between"><h3 className="flex items-center gap-2 text-[20px] font-semibold"><CheckCircle2 className="text-ok" size={22} /> Receipt</h3><Badge tone={r.guide && !r.guide.updated ? "warn" : "ok"}>{r.guide && !r.guide.updated ? "Guide not updated" : `Offline guide updated · v${r.packVersion}`}</Badge></div>
         <p>{r.summary}</p>
         {r.guide && <p className="text-[15px]" data-testid="guide-update">{r.guide.message}{r.guide.regenerated.length ? ` Refreshed: ${r.guide.regenerated.join(", ")}.` : ""}</p>}
-        <dl className="grid grid-cols-2 gap-2 text-[15px]"><dt className="text-muted">{r.kind === "flight_external" ? "Recorded (you paid on the platform)" : "Paid now (test payment)"}</dt><dd className="text-right font-semibold">{inr(r.priceDeltaInr)}</dd><dt className="text-muted">New trip total</dt><dd className="text-right font-semibold">{inr(r.newTotalInr)}</dd><dt className="text-muted">Receipt</dt><dd className="text-right font-mono">{r.receiptId}</dd></dl>
+        <dl className="grid grid-cols-2 gap-2 text-[15px]"><dt className="text-muted">{r.kind === "flight_external" || r.kind === "hotel_external" ? "Recorded (you paid on the platform)" : "Paid now (test payment)"}</dt><dd className="text-right font-semibold">{inr(r.priceDeltaInr)}</dd><dt className="text-muted">New trip total</dt><dd className="text-right font-semibold">{inr(r.newTotalInr)}</dd><dt className="text-muted">Receipt</dt><dd className="text-right font-mono">{r.receiptId}</dd></dl>
         <Link href={`/trips/${refCode}/log`} className="text-accent underline">See action log</Link>
       </section>
     );
   }
+  if (p.t === "hotels") return <HotelCard part={p} online={online} onReview={onReview} />;
   if (p.t === "compare") return <CompareCard part={p} online={online} onRecord={onRecord} />;
   if (p.t === "platforms") return <PlatformCard part={p} online={online} onReview={onReview} />;
   if (p.t === "oa") return null; // rendered by Chat itself (needs the saved pack)

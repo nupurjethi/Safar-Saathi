@@ -11,7 +11,7 @@ import { ORIGINS } from "@/lib/seed/data";
 import { GateError } from "./errors";
 import { hashToken, mintToken, quoteHash, QUOTE_TTL_MS, safeEqual, TOKEN_TTL_MS } from "./tokens";
 
-export type ChangeKind = "flight_change" | "hotel_extend" | "flight_external";
+export type ChangeKind = "flight_change" | "hotel_extend" | "flight_external" | "hotel_external";
 export type Card = { title: string; lines: { label: string; value: string }[] };
 export type ReviewCard = {
   quoteId: string;
@@ -51,8 +51,8 @@ export const priceLimit = () => Number(process.env.PRICE_LIMIT_INR ?? 25000);
 export const REVIEW_NOTICE = "Nothing is booked until you tap Confirm.";
 export const EXTERNAL_NOTICE = "Safar Saathi books and charges nothing here. You already changed the ticket on the platform. Confirm only updates your trip and offline guide.";
 /** A change you made yourself on a booking platform is a record, not a charge by us: the price limit protects what WE would book. */
-const limited = (kind: string) => kind !== "flight_external";
-const sourceOf = (kind: string, params: Record<string, unknown>) => (kind === "flight_external" && isPlatformId(params.platform) ? `Entered by you from ${PLATFORMS[params.platform].name}. Not verified by Safar Saathi` : MOCK_SOURCE);
+const limited = (kind: string) => kind !== "flight_external" && kind !== "hotel_external";
+const sourceOf = (kind: string, params: Record<string, unknown>) => ((kind === "flight_external" || kind === "hotel_external") && isPlatformId(params.platform) ? `Entered by you from ${PLATFORMS[params.platform].name}. Not verified by Safar Saathi` : MOCK_SOURCE);
 
 type Params = Record<string, unknown>;
 type Computed = {
@@ -62,6 +62,7 @@ type Computed = {
   breakup: Breakup[];
   rules: string[];
   plan:
+    | { type: "hotel_external"; mode: "extend" | "replace"; itemId: string; platform: PlatformId; amountInr: number; code?: string; newCheckout?: string; extraNights?: number; hotel?: { name: string; address: string; phone: string; lat: number; lon: number; checkin: string; checkout: string; nights: number; rooms: number } }
     | { type: "flight_external"; itemId: string; platform: PlatformId; flightNo: string; carrierName: string; departAt: string; arriveAt: string; pnr: string; leg: string; fareDiffInr: number; feeInr: number }
     | { type: "flight_change"; itemId: string; newFlightId: string; pnr: string; leg: string; newFarePerPax: number; oldFlightId: string }
     | { type: "hotel_extend"; hotelItemId: string; dropItemId?: string; flightItemId: string; newFlightId: string; oldFlightId: string; extraNights: number; newEnd: string; hotelCost: number; newFarePerPax: number; pnr: string; roomsNeeded: number; hotelId: string; checkoutDate: string };
@@ -126,6 +127,65 @@ export async function computeChange(db: Db, booking: typeof s.bookings.$inferSel
         "Sample fare rules: changes are not allowed within 3 hours of departure. A cheaper new fare is not refunded.",
       ],
       plan: { type: "flight_change", itemId, newFlightId, pnr: String(d.pnr), leg: String(d.leg), newFarePerPax: newFare, oldFlightId: String(d.flightId) },
+    };
+  }
+
+  if (kind === "hotel_external") {
+    const bad = (m: string) => new GateError("BAD_REQUEST", 400, m);
+    if (!isPlatformId(params.platform)) throw bad("Choose MakeMyTrip, Goibibo, Cleartrip or ixigo.");
+    const platform = params.platform, label = PLATFORMS[platform].name;
+    const item = items.find((i) => i.id === String(params.itemId ?? "") && i.kind === "hotel");
+    if (!item) throw new GateError("NOT_FOUND", 404, "That hotel stay is not on this booking.");
+    const d = item.details as Record<string, string | number>;
+    const amount = Number(params.amountPaidInr ?? 0);
+    if (!Number.isInteger(amount) || amount < 0 || amount > 500000) throw bad("Enter the amount you paid in whole rupees, from 0 to 5,00,000.");
+    const code = String(params.confirmationCode ?? "").toUpperCase().replace(/\s+/g, "");
+    if (code && !/^[A-Z0-9]{5,20}$/.test(code)) throw bad("The confirmation code should be 5 to 20 letters or digits, or leave it empty.");
+    const isoDate = (v: unknown, what: string) => { const s = String(v ?? ""); if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(Date.parse(`${s}T00:00:00Z`))) throw bad(`Enter the ${what} date.`); return s; };
+    const nightsOf = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400e3);
+    const oldCard: Card = { title: "Your current stay", lines: [{ label: "Hotel", value: String(d.name) }, { label: "Check in", value: fmtDate(String(d.checkinDate)) }, { label: "Check out", value: fmtDate(String(d.checkoutDate)) }, { label: "Rooms", value: String(d.rooms) }] };
+    const breakupFor = (text: string): Breakup[] => { const b = [{ label: text, amountInr: amount }]; assertBreakup(b, amount); return b; };
+    const mode = params.mode === "replace" ? "replace" : "extend";
+    if (mode === "extend") {
+      const cur = String(d.checkoutDate), nc = isoDate(params.newCheckoutDate, "new check-out");
+      const extra = nightsOf(cur, nc);
+      if (extra < 1) throw bad("The new check-out must be after your current check-out.");
+      if (extra > 14) throw bad("You can extend by up to 14 nights here. For longer, talk to our team.");
+      return {
+        before: oldCard,
+        after: { title: `Stay ${extra} more night${extra > 1 ? "s" : ""}`, lines: [{ label: "Hotel", value: String(d.name) }, { label: "New check out", value: fmtDate(nc) }, { label: "Extra nights", value: String(extra) }, { label: "Booked on", value: label }, ...(code ? [{ label: "Confirmation code", value: code }] : [])] },
+        priceDeltaInr: amount, breakup: breakupFor(`Extra nights you booked on ${label} (${extra})`),
+        rules: [
+          `You extended this stay on ${label} yourself and paid there. Safar Saathi did not book, pay for or check it: we record what you entered so your trip plan and offline guide match.`,
+          "This does NOT move your return flight or airport drop-off. If you fly later, ask me to change the flight too. Compare the dates with your hotel's confirmation before you tap Yes.",
+        ],
+        plan: { type: "hotel_external", mode: "extend", itemId: item.id, platform, amountInr: amount, code: code || undefined, newCheckout: nc, extraNights: extra },
+      };
+    }
+    const name = String(params.hotelName ?? "").trim().slice(0, 80), address = String(params.address ?? "").trim().slice(0, 160);
+    if (name.length < 2) throw bad("Enter the hotel name.");
+    if (address.length < 3) throw bad("Enter the hotel address.");
+    const phoneIn = String(params.phone ?? "").trim();
+    if (phoneIn && !/^[+\d][\d\s().-]{5,19}$/.test(phoneIn)) throw bad("Enter the hotel phone number with digits only, or leave it empty.");
+    const phone = phoneIn || "not saved (see your hotel confirmation)";
+    const lat = Number(params.lat), lon = Number(params.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) throw bad("The hotel needs a location. Pick it from the price comparison.");
+    if (Math.abs(lat - Number(d.lat)) > 0.6 || Math.abs(lon - Number(d.lon)) > 0.6) throw bad("That hotel is not in the same city as your current stay.");
+    const ci = isoDate(params.checkinDate, "check-in"), co = isoDate(params.checkoutDate, "check-out");
+    const nights = nightsOf(ci, co);
+    if (nights < 1 || nights > 30) throw bad("Stay between 1 and 30 nights.");
+    if (ci < addDays(String(d.checkinDate), -1) || ci > String(d.checkoutDate)) throw bad("The new check-in must fall within your current stay.");
+    const rooms = Number(params.rooms ?? d.rooms);
+    if (!Number.isInteger(rooms) || rooms < 1 || rooms > 9) throw bad("Rooms must be 1 to 9.");
+    return {
+      before: oldCard,
+      after: { title: "New hotel (from your booking)", lines: [{ label: "Hotel", value: name }, { label: "Address", value: address }, { label: "Check in", value: fmtDate(ci) }, { label: "Check out", value: fmtDate(co) }, { label: "Rooms", value: String(rooms) }, { label: "Booked on", value: label }, ...(code ? [{ label: "Confirmation code", value: code }] : [])] },
+      priceDeltaInr: amount, breakup: breakupFor(`Stay at ${name} you booked on ${label} (${nights} night${nights > 1 ? "s" : ""})`),
+      rules: [
+        `You booked this hotel on ${label} yourself and paid there. Safar Saathi did not book, pay for or check it: we record what you entered, and the map pin uses the location you picked.`,
+        "This replaces your current hotel on the plan. It does not cancel your old booking: do that on the platform where you booked it. Your airport pickup and drop-off are not changed.",
+      ],
+      plan: { type: "hotel_external", mode: "replace", itemId: item.id, platform, amountInr: amount, code: code || undefined, hotel: { name, address, phone, lat, lon, checkin: ci, checkout: co, nights, rooms } },
     };
   }
 
@@ -262,12 +322,12 @@ export async function computeChange(db: Db, booking: typeof s.bookings.$inferSel
 
 function toCard(q: typeof s.changeQuotes.$inferSelect, bookingRef: string): ReviewCard {
   const over = limited(q.kind) && Math.abs(q.priceDeltaInr) > priceLimit();
-  const title = q.kind === "flight_change" ? "Change your flight" : q.kind === "flight_external" ? "Record your flight change" : "Extend your stay";
+  const title = q.kind === "flight_change" ? "Change your flight" : q.kind === "flight_external" ? "Record your flight change" : q.kind === "hotel_external" ? "Record your stay change" : "Extend your stay";
   return {
     quoteId: q.id, bookingRef, kind: q.kind as ChangeKind, title, before: q.before as unknown as Card, after: q.after as unknown as Card,
     priceDeltaInr: q.priceDeltaInr, rules: q.rules, expiresAt: q.expiresAt.toISOString(), blocked: over,
     blockedReason: over ? `This change costs more than ${inr(priceLimit())}. A person on our team must handle it.` : undefined,
-    notice: q.kind === "flight_external" ? EXTERNAL_NOTICE : REVIEW_NOTICE, chaos: q.chaos,
+    notice: q.kind === "flight_external" || q.kind === "hotel_external" ? EXTERNAL_NOTICE : REVIEW_NOTICE, chaos: q.chaos,
     breakup: q.breakup, totalInr: q.priceDeltaInr, source: q.source, validUntil: q.expiresAt.toISOString(), refundable: false,
   };
 }
@@ -403,13 +463,13 @@ export async function applyChange(input: { quoteId: string; token?: string | nul
     await mutate(tx, booking, live);
     const delta = live.priceDeltaInr;
     const newTotal = booking.totalInr + delta;
-    await tx.update(s.bookings).set({ totalInr: newTotal, updatedAt: new Date(), ...(live.plan.type === "hotel_extend" ? { endDate: live.plan.newEnd } : {}) }).where(eq(s.bookings.id, booking.id));
-    await tx.insert(s.payments).values(live.plan.type === "flight_external" ? { bookingId: booking.id, method: "external", amountInr: delta, status: "recorded" } : { bookingId: booking.id, method: "dummy", amountInr: delta, status: "paid" });
+    await tx.update(s.bookings).set({ totalInr: newTotal, updatedAt: new Date(), ...(live.plan.type === "hotel_extend" ? { endDate: live.plan.newEnd } : live.plan.type === "hotel_external" ? ((e) => (e > booking.endDate ? { endDate: e } : {}))(live.plan.mode === "extend" ? live.plan.newCheckout! : live.plan.hotel!.checkout) : {}) }).where(eq(s.bookings.id, booking.id));
+    await tx.insert(s.payments).values(live.plan.type === "flight_external" || live.plan.type === "hotel_external" ? { bookingId: booking.id, method: "external", amountInr: delta, status: "recorded" } : { bookingId: booking.id, method: "dummy", amountInr: delta, status: "paid" });
     await tx.update(s.changeQuotes).set({ status: "applied", updatedAt: new Date() }).where(eq(s.changeQuotes.id, q.id));
     // the other options offered alongside this one are void now: the booking they priced has changed
     await tx.update(s.changeQuotes).set({ status: "void", updatedAt: new Date() }).where(and(eq(s.changeQuotes.bookingId, booking.id), eq(s.changeQuotes.status, "open")));
     const receiptId = `R-${booking.ref.slice(3)}-${String(Date.now()).slice(-5)}`;
-    const summary = q.kind === "flight_change" || q.kind === "flight_external" ? `Flight moved to ${(q.after as unknown as Card).lines[0].value}` : `Stay extended to ${(q.after as unknown as Card).lines[1].value}`;
+    const summary = q.kind === "flight_change" || q.kind === "flight_external" ? `Flight moved to ${(q.after as unknown as Card).lines[0].value}` : q.kind === "hotel_external" ? `Stay updated: ${(q.after as unknown as Card).lines[0].value}` : `Stay extended to ${(q.after as unknown as Card).lines[1].value}`;
     const receipt = { receiptId, bookingRef: booking.ref, kind: q.kind as ChangeKind, summary, priceDeltaInr: delta, newTotalInr: newTotal, appliedAt: new Date().toISOString() };
     await tx.insert(s.toolCalls).values({ bookingId: booking.id, threadId: input.threadId ?? null, tool: "apply_change", input: { quoteId: q.id }, output: receipt, status: "ok" });
     await tx.insert(s.events).values({ name: "change_applied", userId: input.userId, bookingId: booking.id, props: { receiptId, deltaInr: delta, kind: q.kind } });
@@ -439,6 +499,20 @@ async function mutate(tx: Db, booking: typeof s.bookings.$inferSelect, c: Comput
     await tx.update(s.flights).set({ seatsLeft: sql`${s.flights.seatsLeft} + ${booking.pax}` }).where(eq(s.flights.id, oldFlightId));
     return nf;
   };
+  if (p.type === "hotel_external") {
+    const [old] = await tx.select().from(s.bookingItems).where(eq(s.bookingItems.id, p.itemId));
+    const od = old.details as Record<string, unknown>;
+    const proof = { externalPlatform: p.platform, confirmationCode: p.code ?? null, enteredByTraveller: true };
+    if (p.mode === "extend") {
+      await tx.update(s.bookingItems).set({ details: { ...od, checkoutDate: p.newCheckout, nights: Number(od.nights) + (p.extraNights ?? 0), ...proof }, priceInr: old.priceInr + p.amountInr, updatedAt: new Date() }).where(eq(s.bookingItems.id, p.itemId));
+      return;
+    }
+    const h = p.hotel!;
+    await tx.update(s.bookingItems).set({ status: "replaced", updatedAt: new Date() }).where(eq(s.bookingItems.id, p.itemId));
+    const details = { ...od, hotelId: null, name: h.name, address: h.address, addressLocal: h.address, phone: h.phone, lat: h.lat, lon: h.lon, checkinDate: h.checkin, checkoutDate: h.checkout, nights: h.nights, rooms: h.rooms, rateInr: Math.round(p.amountInr / h.nights / h.rooms), rules: ["Check the hotel's own confirmation for check-in time and rules."], ...proof };
+    await tx.insert(s.bookingItems).values({ bookingId: booking.id, kind: "hotel", refId: null, date: h.checkin, details, priceInr: p.amountInr, status: "confirmed" });
+    return;
+  }
   if (p.type === "flight_external") {
     const [oldItem] = await tx.select().from(s.bookingItems).where(eq(s.bookingItems.id, p.itemId));
     const od = oldItem.details as Record<string, unknown>;

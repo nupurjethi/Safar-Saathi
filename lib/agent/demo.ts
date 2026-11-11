@@ -36,17 +36,12 @@ export async function demoAgent(message: string, ctx: ToolCtx, e: Emit): Promise
   const flights = (it.flights as Flight[]) ?? [];
 
   if (/\b(extend|extra night|stay (longer|more)|one more night|add (a )?night)\b/.test(m)) {
-    const n = Math.min(3, Math.max(1, Number(m.match(/\b([1-3])\b/)?.[1] ?? (/\btwo\b/.test(m) ? 2 : 1))));
-    const st = await call("search_stays", { extraNights: n }, ctx, e);
-    if (isErr(st) || !st.available) return isErr(st) ? st.message : `${st.hotel} has no rooms for all ${n} extra night(s). I can pass this to our team if you want.`;
-    const q = await call("quote_change", { kind: "hotel_extend", extraNights: n }, ctx, e);
-    if (isErr(q)) return q.message;
-    const opt = (q.options as { blocked: boolean; price: string }[])[0];
-    if (opt.blocked) {
-      const c = await call("escalate_human", { summary: `Hotel extension of ${n} night(s) quoted at ${opt.price}, above the price limit.`, severity: 3 }, ctx, e);
-      return `That costs more than our price limit, so I have passed it to our team. Case ID ${c.caseRef ?? ""}.`;
-    }
-    return `${st.hotel} can host you ${n} more night${n > 1 ? "s" : ""} (to ${st.newCheckOut}). Your return flight and airport drop-off move with it. Total ${opt.price} for all travellers, with the full breakup on the card. Tap Yes to confirm or No. Nothing is booked until you do.`;
+    const n = Math.min(14, Math.max(1, Number(m.match(/\b(\d{1,2})\b/)?.[1] ?? (/\btwo\b/.test(m) ? 2 : 1))));
+    const r = await call("compare_hotels", { extraNights: n }, ctx, e);
+    if (isErr(r)) return r.message;
+    if (!r.configured) return `To stay ${n} more night${n > 1 ? "s" : ""} you book on a travel platform. I cannot log in there for you (I never see your password), and I do not have a live hotel price feed connected, so I cannot compare prices. The card below has links to MakeMyTrip, Goibibo, Cleartrip and ixigo and the exact city and dates to search. Compare there, pay there, then record your booking on the card. You review it and tap Yes before I update your trip. Your flight does not move automatically: ask me if you fly later.`;
+    if (!(r.offers as unknown[]).length) return "The price source returned no hotels for those dates. Try other dates, or search on a platform from the card.";
+    return `I compared live hotel prices near your stay. Cheapest: ${r.cheapest}. Those are reference prices, so open your platform from the card, log in, book and pay there, then record the booking on the card. I cannot log in or take payment. Your flight does not move automatically.`;
   }
 
   if (/\b(move|change|rebook|re-book|reschedule|later|earlier|shift|cancel|refund)\b.*\b(flight|fly)\b|\b(flight|fly)\b.*\b(move|change|rebook|later|earlier|cancel|refund)\b|\brebook\b/.test(m)) {

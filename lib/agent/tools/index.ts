@@ -19,6 +19,8 @@ import { refreshOfflinePack } from "@/lib/packs/refresh";
 import { connectedPlatforms } from "@/lib/server/connections";
 import { platformLinks } from "@/lib/providers/platforms";
 import { compareFlights } from "@/lib/providers/compare";
+import { compareHotels, type HotelOffer } from "@/lib/providers/hotels";
+import { hotelLinks } from "@/lib/providers/platforms";
 import { addDays, fmtDate, inr, localDate, localTime, tzLabel, zonedToUtc } from "@/lib/time";
 import { rateSeverity, SLA_SECONDS, type Severity } from "../severity";
 
@@ -28,6 +30,7 @@ export type UiEvent =
   | { t: "route"; routeId: string; fromName: string; toName: string; distance_m: number; duration_s: number; approximate: boolean; url: string }
   | { t: "receipt"; receipt: unknown }
   | { t: "compare"; bookingRef: string; itemId: string; query: { from: string; to: string; date: string; pax: number }; flight: { flightNo: string; carrier: string; from: string; to: string; date: string; departsLocal: string; arrivesLocal: string; departIso: string; arriveIso: string; pnr: string; leg: string; pax: number }; providers: { name: string; ok: boolean; count: number; error?: string }[]; offers: { id: string; providerLabel: string; source: string; totalInr: number; perTravellerInr: number; breakup: { label: string; amountInr: number }[]; facts: { carrier: string; flightNo: string; from: string; to: string; departLocal: string; arriveLocal: string; stops: number; durationMin?: number }; validUntil: string }[]; cheapestId?: string; fastestId?: string; platforms: { id: string; name: string; searchUrl: string; manageUrl: string; connected: boolean }[] }
+  | { t: "hotels"; bookingRef: string; itemId: string; configured: boolean; current: { name: string; city: string; address: string; checkin: string; checkout: string; rooms: number; lat: number; lon: number }; query: { checkin: string; checkout: string; nights: number; rooms: number; adults: number; city: string }; providers: { name: string; ok: boolean; count: number; error?: string }[]; offers: HotelOffer[]; cheapestId?: string; platforms: { id: string; name: string; hotelsUrl: string; connected: boolean }[] }
   | { t: "platforms"; bookingRef: string; itemId: string; flight: { flightNo: string; carrier: string; from: string; to: string; date: string; departsLocal: string; arrivesLocal: string; departIso: string; arriveIso: string; pnr: string; leg: string; pax: number }; platforms: { id: string; name: string; searchUrl: string; manageUrl: string; connected: boolean }[] };
 
 export type ToolCtx = {
@@ -43,11 +46,11 @@ export type ToolCtx = {
   ui: (e: UiEvent) => void;
 };
 
-export const TOOL_NAMES = ["get_itinerary", "get_route", "search_flights", "connect_platform", "compare_flights", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"] as const;
+export const TOOL_NAMES = ["get_itinerary", "get_route", "search_flights", "connect_platform", "compare_flights", "compare_hotels", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 /** The model's allow-list. refresh_offline_pack is a server-side job that runs only after apply_change succeeds. */
 /** search_flights (mock inventory) is not offered to the model: flight changes go through the traveller's own booking platform (connect_platform). */
-export const MODEL_TOOLS: ToolName[] = TOOL_NAMES.filter((t) => t !== "refresh_offline_pack" && t !== "search_flights");
+export const MODEL_TOOLS: ToolName[] = TOOL_NAMES.filter((t) => t !== "refresh_offline_pack" && t !== "search_flights" && t !== "search_stays");
 
 /** Tools that SMS-channel runs may use (read-only plus escalation). */
 export const SMS_SAFE_TOOLS: ToolName[] = ["get_itinerary", "escalate_human", "send_sms"];
@@ -210,6 +213,36 @@ export async function compareFlightsTool(ctx: ToolCtx, input: { itemId?: string;
   };
 }
 
+/**
+ * Hotel changes: the agent compares live hotel prices near the traveller's stay from the official price API (when configured),
+ * then sends them to MakeMyTrip, Goibibo, Cleartrip or ixigo to book and pay (they log in there; we cannot, and cannot read their
+ * prices). They record the booking afterwards through the Confirm gate. With no price source it says so and shows the details to enter.
+ */
+export async function compareHotelsTool(ctx: ToolCtx, input: { extraNights?: number; nights?: number; checkin?: string }) {
+  const db = await getDb();
+  const rows = await db.select().from(s.bookingItems).where(and(eq(s.bookingItems.bookingId, ctx.bookingId), eq(s.bookingItems.kind, "hotel"), eq(s.bookingItems.status, "confirmed")));
+  const cur = rows.sort((a, b) => String(a.details.checkinDate).localeCompare(String(b.details.checkinDate))).at(-1);
+  if (!cur) throw new GateError("NOT_FOUND", 404, "No hotel on this booking.");
+  const d = cur.details as Record<string, string | number>;
+  const pack = await loadPack(ctx);
+  const nights = Math.min(14, Math.max(1, input.nights ?? input.extraNights ?? 1));
+  const checkin = input.checkin ?? String(d.checkoutDate);
+  const query = { checkin, checkout: addDays(checkin, nights), nights, rooms: Number(d.rooms), adults: pack.booking.pax, city: String(d.cityName ?? d.city) };
+  const connected = await connectedPlatforms(ctx.userId, db);
+  const res = await compareHotels({ lat: Number(d.lat), lon: Number(d.lon), checkin: query.checkin, checkout: query.checkout, rooms: query.rooms, adults: query.adults });
+  const platforms = hotelLinks().map((p) => ({ ...p, connected: connected.includes(p.id as never) }));
+  ctx.ui({ t: "hotels", bookingRef: ctx.bookingRef, itemId: cur.id, configured: res.configured, current: { name: String(d.name), city: query.city, address: String(d.address), checkin: String(d.checkinDate), checkout: String(d.checkoutDate), rooms: query.rooms, lat: Number(d.lat), lon: Number(d.lon) }, query, providers: res.providers, offers: res.offers, cheapestId: res.cheapestId, platforms });
+  if (!res.configured) return { configured: false, query, next: "No live hotel price source is configured, so you CANNOT compare prices. Say so plainly. A card with links to MakeMyTrip, Goibibo, Cleartrip and ixigo hotel search and the details to enter is on screen: tell the traveller to log in there, compare, pay there, then record the booking on the card. Never invent a price." };
+  return {
+    configured: true, query, providers: res.providers,
+    offers: res.offers.map((o) => ({ hotel: o.hotelName, room: o.roomType, totalInr: o.totalInr, perNightInr: o.perNightInr, refundable: o.refundable, source: o.source })),
+    cheapest: res.offers[0] ? `${res.offers[0].hotelName} at ₹${res.offers[0].totalInr} for ${nights} night(s)` : null,
+    next: res.offers.length
+      ? "A hotel comparison is on screen with live prices from an official API. Summarise the cheapest in 2 sentences. These are reference prices: MakeMyTrip, Goibibo, Cleartrip and ixigo can differ, so the traveller opens their platform from the card, logs in, books and pays there. You cannot log in, read those prices or take payment. After booking they record it on the card and tap Yes."
+      : "The price source returned no hotels for those dates. Say so and suggest other dates or searching on a platform from the card.",
+  };
+}
+
 export async function searchStaysTool(ctx: ToolCtx, input: { extraNights: number }) {
   const db = await getDb();
   const items = await db.select().from(s.bookingItems).where(and(eq(s.bookingItems.bookingId, ctx.bookingId), eq(s.bookingItems.kind, "hotel"), eq(s.bookingItems.status, "confirmed")));
@@ -289,6 +322,7 @@ export const SCHEMAS = {
   get_route: z.object({ from: z.string().max(80).optional().describe("Place name, or 'hotel' / 'airport'. Defaults to the hotel."), to: z.string().max(80).describe("Place name, or 'hotel' / 'airport'.") }),
   search_flights: z.object({ itemId: Id.describe("Booked flight itemId from get_itinerary"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }),
   compare_flights: z.object({ itemId: Id.optional().describe("Booked flight itemId. Defaults to the next upcoming flight."), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Travel date the traveller wants, YYYY-MM-DD. Defaults to the booked flight's day."), from: z.string().regex(/^[A-Za-z]{3}$/).optional().describe("IATA origin if different from the booked flight"), to: z.string().regex(/^[A-Za-z]{3}$/).optional().describe("IATA destination if different") }),
+  compare_hotels: z.object({ extraNights: z.number().int().min(1).max(14).optional().describe("Nights to add after the current check-out"), nights: z.number().int().min(1).max(14).optional().describe("Nights for a different stay"), checkin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Check-in date if not the current check-out") }),
   connect_platform: z.object({ itemId: Id.optional().describe("Booked flight itemId from get_itinerary. Defaults to the next upcoming flight.") }),
   search_stays: z.object({ extraNights: z.number().int().min(1).max(3) }),
   search_web: z.object({ query: z.string().min(3).max(200).describe("A travel information question, e.g. visa rules or opening hours") }),
@@ -304,6 +338,7 @@ export const DESCRIPTIONS: Record<ToolName, string> = {
   get_route: "Get a saved map route and steps between two places on the trip (e.g. hotel to Colosseum).",
   search_flights: "Find alternative flights for a booked flight on the same route and day.",
   compare_flights: "Use FIRST for any request to change, move, reschedule or rebook a FLIGHT, or to book a new one. Compares real fares from the official price APIs that are configured, then shows the traveller a comparison and pre-filled links to MakeMyTrip, Goibibo, Cleartrip and ixigo where they pay. If no price API is configured it shows the platform picker instead. Does not book, pay or change anything.",
+  compare_hotels: "Use FIRST for any request to extend, change or move a HOTEL stay. Compares live hotel prices near the traveller's stay from the official price API (when configured) and shows links to MakeMyTrip, Goibibo, Cleartrip and ixigo where they book and pay, plus a form to record the booking. Does not book, pay or change anything.",
   connect_platform: "Use only when the traveller just wants the platform links without a price comparison, or wants to cancel or get a refund for a FLIGHT. Shows a picker to open MakeMyTrip, Goibibo, Cleartrip or ixigo (the traveller logs in there themselves) and a form to record the new flight. Does not search, price or change anything.",
   search_stays: "Check availability to extend the stay at the last hotel by 1 to 3 nights.",
   search_web: "Look up general travel information with a web search API. Cites sources. Never a booking price.",
@@ -318,6 +353,9 @@ export const DESCRIPTIONS: Record<ToolName, string> = {
 export async function runTool(name: ToolName, rawInput: unknown, ctx: ToolCtx, opts: { internal?: boolean; fromModel?: boolean } = {}) {
   if (name === "refresh_offline_pack" && !opts.internal) throw new GateError("FORBIDDEN", 403, "refresh_offline_pack is a server-side job. It runs only after apply_change succeeds.");
   const input = SCHEMAS[name].parse(rawInput ?? {}) as never;
+  if (opts.fromModel && name === "quote_change" && (input as { kind: string }).kind === "hotel_extend") {
+    return { error: "USE_PLATFORM", message: "Stay changes are not quoted from sample data. Call compare_hotels so the traveller books on their own platform." };
+  }
   if (opts.fromModel && name === "quote_change" && (input as { kind: string }).kind === "flight_change") {
     return { error: "USE_PLATFORM", message: "Flight changes are not quoted from sample data. Call connect_platform so the traveller changes the ticket on their own booking platform." };
   }
@@ -328,6 +366,7 @@ export async function runTool(name: ToolName, rawInput: unknown, ctx: ToolCtx, o
       case "search_flights": return searchFlightsTool(ctx, input);
       case "connect_platform": return connectPlatformTool(ctx, input);
       case "compare_flights": return compareFlightsTool(ctx, input);
+      case "compare_hotels": return compareHotelsTool(ctx, input);
       case "search_stays": return searchStaysTool(ctx, input);
       case "search_web": return searchWeb((input as { query: string }).query);
       case "refresh_offline_pack": return refreshOfflinePack(ctx.bookingId, "Manual refresh");

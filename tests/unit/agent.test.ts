@@ -18,8 +18,8 @@ const emit = { step: () => {}, text: () => {} };
 beforeAll(async () => { c = await setupDb(); });
 
 describe("agent tools", () => {
-  it("registers 12 tools; the model gets 10 (refresh_offline_pack is server-only, search_flights is mock-only) and none can mint a token", () => {
-    expect(TOOL_NAMES).toEqual(["get_itinerary", "get_route", "search_flights", "connect_platform", "compare_flights", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"]);
+  it("registers 13 tools; the model gets 10 (refresh_offline_pack is server-only, search_flights and search_stays are mock-only) and none can mint a token", () => {
+    expect(TOOL_NAMES).toEqual(["get_itinerary", "get_route", "search_flights", "connect_platform", "compare_flights", "compare_hotels", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"]);
     expect(Object.keys(aiTools(mk())).sort()).toEqual([...MODEL_TOOLS].sort());
     expect(Object.keys(aiTools(mk()))).not.toContain("refresh_offline_pack");
     expect(Object.keys(aiTools(mk()))).not.toContain("search_flights"); // flight changes never use sample inventory in chat
@@ -127,15 +127,25 @@ describe("demo agent (STUB used when no LLM key is set)", () => {
     expect(t).toMatch(/cannot close this case/);
   });
 
-  it("an over-limit change is blocked and escalated instead of offering Confirm", async () => {
-    const prev = process.env.PRICE_LIMIT_INR;
-    process.env.PRICE_LIMIT_INR = "10";
-    try {
-      events.length = 0;
-      const t = await demoAgent("Extend my stay by 1 night", mk(), emit);
-      expect(t).toMatch(/passed it to our team/);
-      expect(events.some((e) => e.t === "case")).toBe(true);
-    } finally { process.env.PRICE_LIMIT_INR = prev; }
+  it("a stay change goes to the traveller's own platform: compare_hotels card, no sample hotel, never says it is done", async () => {
+    events.length = 0;
+    const t = await demoAgent("Extend my stay by 1 night", mk(), emit);
+    expect(events.some((e) => e.t === "review")).toBe(false);
+    const h = events.find((e) => e.t === "hotels") as Extract<UiEvent, { t: "hotels" }>;
+    expect(h).toBeTruthy();
+    expect(h.configured).toBe(false);
+    expect(h.offers).toEqual([]);
+    expect(h.platforms.map((p) => p.name)).toEqual(["MakeMyTrip", "Goibibo", "Cleartrip", "ixigo"]);
+    expect(h.query.nights).toBe(1);
+    expect(t).toMatch(/do not have a live hotel price feed/);
+    expect(t).toMatch(/never see your password/);
+  });
+
+  it("the model cannot quote a stay extension from sample data", async () => {
+    const tools = aiTools(mk()) as Record<string, { execute: (i: unknown) => Promise<{ error?: string }> }>;
+    expect((await tools.quote_change.execute({ kind: "hotel_extend", extraNights: 1 })).error).toBe("USE_PLATFORM");
+    expect(Object.keys(tools)).not.toContain("search_stays");
+    expect(Object.keys(tools)).toContain("compare_hotels");
   });
 });
 
