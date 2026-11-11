@@ -151,6 +151,7 @@ async function navigation(req, url) {
 
 /** Serve from the trip / shell caches; answer Range requests by slicing the cached full file. */
 async function fromPackFiles(req, url) {
+  if (url.searchParams.has("ss-refresh")) { try { return await fetch(req); } catch (e) { return new Response("Offline", { status: 504 }); } } // an update download: never answer from the saved copy
   const key = new URL(url.href).href;
   // search every cache: tiles live in the trip's own namespace, map style/worker in the shared shell cache
   const hit = await caches.match(key, { ignoreSearch: true });

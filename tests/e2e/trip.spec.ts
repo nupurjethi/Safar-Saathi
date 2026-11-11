@@ -89,6 +89,23 @@ test("1. Explore → select → guide ready → offline guide/map/address card/S
   await context.setOffline(false);
   await expect(page.getByTestId("sos-sent")).toContainText(/Case sent\.\s*Reference\s+SS-C-\d+/, { timeout: 30_000 });
 
+  // An UPDATED map file must be able to replace an old saved one: a normal tile read is answered from the phone's saved copy,
+  // but the update download (?ss-refresh=1) must reach the network. Otherwise a trip whose map grew would stay on the old, smaller map.
+  const probe = await page.evaluate(async (r) => {
+    const name = (await caches.keys()).find((n) => n.startsWith(`ss-trip-${r}`))!;
+    const cache = await caches.open(name);
+    const key = (await cache.keys()).find((k) => k.url.endsWith("-core.pmtiles"))!;
+    const real = await cache.match(key);
+    await cache.put(key, new Response(new Uint8Array(500), { headers: { "Content-Type": "application/octet-stream" } })); // pretend this is the old copy
+    const magic = async (u: string) => new TextDecoder().decode(await (await fetch(u, { headers: { Range: "bytes=0-6" } })).arrayBuffer());
+    const saved = await magic(key.url);
+    const refreshed = await magic(`${key.url}?ss-refresh=1`);
+    await cache.put(key, real!); // put the real file back
+    return { saved, refreshed };
+  }, ref);
+  expect(probe.saved).not.toBe("PMTiles"); // served from the saved (old) copy
+  expect(probe.refreshed).toBe("PMTiles"); // the update download reaches the network
+
   // 6. book (payment confirms the booking; it does not start any download)
   await page.goto(`/trips/${ref}`);
   await page.getByTestId("book-trip").click();

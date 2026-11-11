@@ -27,6 +27,7 @@ let base: OfflinePack;
 const tileBytes = { paris: enc("PARIS-TILES-v1".repeat(50)), rome: enc("ROME-TILES-v1".repeat(50)) };
 let tileHashes: Record<string, string> = {};
 let fetchLog: string[] = [];
+let refreshFlagged: boolean[] = [];
 const served: Record<string, { body: Uint8Array | string; status?: number }> = {};
 
 async function packFor(version: number, mutate: (p: OfflinePack) => void = () => {}) {
@@ -63,14 +64,16 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  store.clear(); fetchLog = [];
+  store.clear(); fetchLog = []; refreshFlagged = [];
   const db = offlineDb();
   await Promise.all([db.trips.clear(), db.tripPacks.clear(), db.rulesets.clear(), db.fileRecs.clear()]);
   vi.stubGlobal("caches", memCaches);
   vi.stubGlobal("location", { origin: "http://localhost" });
   vi.stubGlobal("fetch", async (input: string | Request) => {
     const url = typeof input === "string" ? input : input.url;
-    const path = url.replace("http://localhost", "");
+    // update downloads carry ?ss-refresh=1 so the service worker skips its saved copy (see downloadVerified); the "server" ignores it
+    const path = url.replace("http://localhost", "").replace(/[?&]ss-refresh=1$/, "");
+    refreshFlagged.push(/ss-refresh=1/.test(url));
     fetchLog.push(path);
     const hit = served[path];
     if (!hit) return new Response("nope", { status: 404 });
@@ -79,6 +82,15 @@ beforeEach(async () => {
 });
 
 describe("per-trip cache, hash checks, atomic swap and resume (spec 4)", () => {
+  it("tile, photo and map-file downloads ask the service worker to skip its saved copy (so an updated file can replace an old one)", async () => {
+    const p1 = await packFor(1); const ref = p1.booking.ref;
+    serve(p1, manifestFor(p1, [{ slug: "paris", hash: tileHashes.paris }]));
+    await syncTrip(ref);
+    const tileCalls = fetchLog.map((path, i) => ({ path, flagged: refreshFlagged[i] })).filter((x) => x.path.endsWith(".pmtiles"));
+    expect(tileCalls.length).toBeGreaterThan(0);
+    expect(tileCalls.every((x) => x.flagged)).toBe(true);
+  });
+
   it("syncs a trip into its own cache namespace and activates version 1", async () => {
     const p1 = await packFor(1); const ref = p1.booking.ref;
     serve(p1, manifestFor(p1, [{ slug: "paris", hash: tileHashes.paris }]));

@@ -37,7 +37,9 @@ const abs = (url: string) => new URL(url, typeof location !== "undefined" ? loca
 
 /** Download one file, verify its SHA-256, and only then write it to the cache. A bad hash throws and writes nothing. */
 export async function downloadVerified(cache: Cache, url: string, expectedHash: string | undefined, onBytes: (n: number) => void) {
-  const res = await fetch(url, { credentials: "same-origin" });
+  // "?ss-refresh=1" tells the service worker to go to the network: otherwise it would hand back the copy we already saved
+  // and an UPDATED file (new tiles, new photo) could never replace its old version.
+  const res = await fetch(url + (url.includes("?") ? "&" : "?") + "ss-refresh=1", { credentials: "same-origin", cache: "no-store" });
   if (!res.ok || !res.body) throw new Error(`Download failed (${res.status}) for ${url}`);
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
