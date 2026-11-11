@@ -1,5 +1,5 @@
 import { CloudOff, MessageSquareText } from "lucide-react";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/ui/SafeLink";
 
 /** Two separate chats: the online Trip agent and the offline assistant. Never mixed. */
 export function ChatTabs({ refCode, active }: { refCode: string; active: "online" | "offline" }) {

@@ -78,7 +78,13 @@ export async function syncTrip(ref: string, onProgress?: (p: SyncProgress) => vo
     const manifest = (await mres.json()) as PackManifest;
     const local = await getStored(ref);
     oldActive = local?.version ?? 0;
-    if (!opts.force && local && local.contentHash === manifest.contentHash) { emit({ phase: "done" }); return { updated: false, version: local.version, reason: "up-to-date" }; }
+    if (!opts.force && local && local.contentHash === manifest.contentHash) {
+      // Same pack, but the phone may have lost files (iOS clears storage) or the page list may have grown since it was saved:
+      // check everything is really there and fetch whatever is missing, so offline never meets a hole.
+      await healMissing(manifest, ref, local.version, emit);
+      emit({ phase: "done" });
+      return { updated: false, version: local.version, reason: "up-to-date" };
+    }
     if (manifest.overBudget && !opts.allowOverBudget) return { updated: false, version: oldActive, reason: "over-budget", message: `This trip needs ${(manifest.totalBytes / 1048576).toFixed(0)} MB, over the ${(manifest.budgetBytes / 1048576).toFixed(0)} MB budget. Download maps over Wi-Fi.` };
 
     const newV = manifest.packVersion;
@@ -123,14 +129,7 @@ export async function syncTrip(ref: string, onProgress?: (p: SyncProgress) => vo
 
     // 3) app pages and lazy chunks via the service worker, so the guide, map and SOS open with no network
     emit({ phase: "pages" });
-    await swPost({ type: "CACHE_URLS", urls: manifest.files.filter((f) => f.kind === "page").map((f) => f.url) });
-    if (typeof document !== "undefined") {
-      await Promise.allSettled([import("@/components/map/TripMap"), import("maplibre-gl"), import("pmtiles")]);
-      const fromTiming = performance.getEntriesByType("resource").map((e) => e.name);
-      const fromDom = [...document.querySelectorAll<HTMLElement>("script[src], link[href]")].map((n) => (n as HTMLScriptElement).src || (n as HTMLLinkElement).href);
-      const loaded = [...fromTiming, ...fromDom].map((u) => { try { return new URL(u).pathname; } catch { return ""; } }).filter((p) => p.startsWith("/_next/static/"));
-      await swPost({ type: "CACHE_ASSETS", urls: [...new Set(loaded)] });
-    }
+    await cacheShell(manifest.files.filter((f) => f.kind === "page").map((f) => f.url));
     emit({ doneFiles: prog.doneFiles + 1 });
 
     // 4) ATOMIC SWAP: write version n+1, then flip activeVersion in one transaction. Old version n stays active until here.
@@ -156,3 +155,42 @@ export async function syncTrip(ref: string, onProgress?: (p: SyncProgress) => vo
     return { updated: false, version: oldActive || (await getStored(ref))?.version || 0, reason: offline ? "offline" : "error", message: e instanceof Error ? e.message : String(e) };
   }
 }
+
+
+/** Save the app pages through the service worker, then every JS/CSS chunk those pages (and the lazy map code) need. */
+async function cacheShell(pageUrls: string[]) {
+  await swPost({ type: "CACHE_URLS", urls: pageUrls });
+  if (typeof document !== "undefined") {
+    await Promise.allSettled([import("@/components/map/TripMap"), import("maplibre-gl"), import("pmtiles")]);
+    const fromTiming = performance.getEntriesByType("resource").map((e) => e.name);
+    const fromDom = [...document.querySelectorAll<HTMLElement>("script[src], link[href]")].map((n) => (n as HTMLScriptElement).src || (n as HTMLLinkElement).href);
+    const loaded = [...fromTiming, ...fromDom].map((u) => { try { return new URL(u).pathname; } catch { return ""; } }).filter((p) => p.startsWith("/_next/static/"));
+    await swPost({ type: "CACHE_ASSETS", urls: [...new Set(loaded)] });
+  }
+}
+
+/** Verify the saved bundle is complete (map files, photos, fonts, pages) and download only what is missing. Never throws. */
+async function healMissing(manifest: PackManifest, ref: string, version: number, emit: (p: Partial<SyncProgress>) => void) {
+  try {
+    if (typeof caches === "undefined") return;
+    const tripCache = await caches.open(tripCacheName(ref, version));
+    const shell = await caches.open(SHELL_CACHE);
+    const db = offlineDb();
+    const missingFiles = [];
+    for (const f of manifest.files.filter((x) => x.kind === "tiles" || x.kind === "map-asset" || x.kind === "image")) {
+      const target = f.kind === "map-asset" ? shell : tripCache;
+      if (!(await target.match(abs(f.url)))) missingFiles.push({ f, target });
+    }
+    if (missingFiles.length) emit({ phase: "maps", totalFiles: missingFiles.length, doneFiles: 0, totalBytes: missingFiles.reduce((a, x) => a + x.f.bytes, 0), loadedBytes: 0 });
+    for (const { f, target } of missingFiles) {
+      await downloadVerified(target, f.url, f.hash, (b) => emit({ loadedBytes: (prog0.loadedBytes += b) }));
+      await db.fileRecs.put({ ref, url: f.url, hash: f.hash, bytes: f.bytes, version: f.kind === "map-asset" ? 0 : version, cachedAt: Date.now() });
+    }
+    const pages = manifest.files.filter((f) => f.kind === "page").map((f) => f.url);
+    let pageMissing = false;
+    for (const u of pages) if (!(await shell.match(new URL(u, location.origin).pathname))) { pageMissing = true; break; }
+    // always refresh the chunk list when anything was missing; cheap when nothing is
+    if (pageMissing || missingFiles.length) await cacheShell(pages);
+  } catch { /* a heal that fails leaves the saved version exactly as it was */ }
+}
+const prog0 = { loadedBytes: 0 };

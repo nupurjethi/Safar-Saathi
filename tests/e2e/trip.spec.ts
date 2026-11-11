@@ -451,3 +451,45 @@ test("12. Add travel plan: upload several files, each is read, and the plan is p
   await page.goto("/trips");
   await expect(page.getByTestId("add-plan-btn")).toBeVisible();
 });
+
+test("13. offline: every trip page opens, switching between the Trip agent and the offline assistant works, and missing saved files are re-downloaded automatically", async ({ page, context }) => {
+  await loginAs(page, "traveller", "/explore");
+  await page.getByTestId("itinerary-card").first().click();
+  await page.getByTestId("select-btn").click();
+  await expect(page.getByTestId("offline-ready")).toHaveText("Offline guide ready", { timeout: 60_000 });
+  const ref = (await page.getByText(/^SS-\d{5}$/).first().innerText()).trim();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+
+  // simulate what iOS does: it drops a saved page and a saved map file
+  await page.evaluate(async (r) => {
+    const shell = await caches.open("ss-shell-v2");
+    await shell.delete(`/trips/${r}/offline`);
+    await shell.delete(`/trips/${r}/voucher`);
+    const name = (await caches.keys()).find((n) => n.startsWith(`ss-trip-${r}`))!;
+    const cache = await caches.open(name);
+    const tile = (await cache.keys()).find((k) => k.url.endsWith(".pmtiles"));
+    if (tile) await cache.delete(tile);
+  }, ref);
+  await page.reload(); // the quiet re-check on arrival refills what is missing
+  await expect.poll(() => page.evaluate(async (r) => {
+    const shell = await caches.open("ss-shell-v2");
+    const name = (await caches.keys()).find((n) => n.startsWith(`ss-trip-${r}`))!;
+    const tiles = (await (await caches.open(name)).keys()).filter((k) => k.url.endsWith(".pmtiles")).length;
+    return { offlinePage: !!(await shell.match(`/trips/${r}/offline`)), voucher: !!(await shell.match(`/trips/${r}/voucher`)), tiles: tiles > 0 };
+  }, ref), { timeout: 60_000 }).toEqual({ offlinePage: true, voucher: true, tiles: true });
+
+  await context.setOffline(true);
+  await page.goto(`/trips/${ref}/chat`);
+  await expect(page.getByTestId("chat-tab-offline")).toBeVisible();
+  await page.getByTestId("chat-tab-offline").click(); // switch to the offline assistant with no network
+  await expect(page.getByTestId("offline-chat")).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("chat-tab-online").click(); // and back
+  await expect(page.getByTestId("chat-tab-online")).toHaveAttribute("aria-current", "page", { timeout: 15_000 });
+  for (const p of ["", "/guide", "/map", "/sos", "/log", "/voucher"]) {
+    await page.goto(`/trips/${ref}${p}`);
+    await expect(page.locator("main")).not.toContainText("You are offline and this page is not saved", { timeout: 10_000 });
+    await expect(page).not.toHaveTitle(/^You are offline/); // the real page, not the generic "not saved" fallback
+    await expect(page.locator("body")).not.toContainText("That page is not saved on this phone");
+  }
+  await context.setOffline(false);
+});

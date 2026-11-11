@@ -1,6 +1,6 @@
 "use client";
 import { House, LifeBuoy, ListChecks, Map as MapIcon, MessageCircle, ScrollText } from "lucide-react";
-import Link from "next/link";
+import { SafeLink as Link } from "@/components/ui/SafeLink";
 import { usePathname } from "next/navigation";
 
 const TABS = [

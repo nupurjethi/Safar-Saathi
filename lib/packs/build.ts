@@ -235,7 +235,9 @@ export function buildManifest(pack: OfflinePack, bookingId: string, packBytes: n
     files.push({ url: f.url, kind: "map-asset", bytes: buf.length, hash: sha256(buf) });
   }
   const ref = pack.booking.ref;
-  for (const p of ["", "/chat", "/offline", "/guide", "/map", "/sos", "/log"]) files.push({ url: `/trips/${ref}${p}`, kind: "page", bytes: 0 });
+  for (const p of ["", "/chat", "/offline", "/guide", "/map", "/sos", "/log", "/voucher"]) files.push({ url: `/trips/${ref}${p}`, kind: "page", bytes: 0 });
+  // the screens people reach from inside a trip, so every tap still works with no signal
+  for (const p of ["/trips", "/explore", "/plans/new"]) files.push({ url: p, kind: "page", bytes: 0 });
   files.push({ url: "/offline", kind: "page", bytes: 0 });
   const totalBytes = files.reduce((a, f) => a + f.bytes, 0);
   return { bookingRef: ref, packVersion: pack.packVersion, contentHash: pack.contentHash, builtAt: pack.builtAt, totalBytes, budgetBytes: PACK_BUDGET_BYTES, overBudget: totalBytes > PACK_BUDGET_BYTES, files };
