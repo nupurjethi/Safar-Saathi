@@ -56,7 +56,7 @@ export function buildStyle(cities: PackMapCity[], dark: boolean): StyleSpecifica
       const src = `ov-${c.id}`;
       sources[src] = { type: "vector", url: `pmtiles://${abs(c.pmtiles)}`, attribution: "© OpenStreetMap contributors" };
       // overview labels stop at zoom 13, where the core file's finer labels take over
-      overview.push(...prefixed(src, flavor, `${src}-`, { symbolMaxzoom: 13 }));
+      overview.push(...prefixed(src, flavor, `${src}-`, c.core?.pmtiles ? { symbolMaxzoom: 13 } : {})); // a city with only one map file (e.g. generated for an uploaded plan) keeps its labels at every zoom
     }
     if (c.core?.pmtiles) {
       const src = `core-${c.id}`;
