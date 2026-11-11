@@ -42,7 +42,7 @@ describe("agent tools", () => {
     const search = (await runTool("search_flights", { itemId: inter.itemId }, mk())) as { alternatives: { flightId: string }[] };
     const q = (await runTool("quote_change", { kind: "flight_change", itemId: inter.itemId, newFlightId: search.alternatives[0].flightId }, mk())) as { options: { quoteId: string }[] };
     const [before] = await c.db.select().from(s.bookings).where(eq(s.bookings.id, c.booking.id));
-    const r = (await runTool("apply_change", { quoteId: q.options[0].quoteId }, mk())) as { applied: boolean; error: string };
+    const r = (await runTool("apply_change", { quoteId: q.options[0].quoteId }, mk())) as unknown as { applied: boolean; error: string };
     expect(r.applied).toBe(false);
     expect(r.error).toBe("CONFIRMATION_REQUIRED");
     const [after] = await c.db.select().from(s.bookings).where(eq(s.bookings.id, c.booking.id));

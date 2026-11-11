@@ -33,6 +33,8 @@ export async function verifyCode(email: string, code: string) {
   if (row.codeHash !== hash(email, code)) throw new GateError("TOKEN_INVALID", 401, "That code is not right.");
   await db.update(s.loginCodes).set({ usedAt: new Date() }).where(eq(s.loginCodes.id, row.id));
   const [existing] = await db.select().from(s.users).where(eq(s.users.email, email.toLowerCase())).limit(1);
+  // With no email key the code is shown on screen/log, so it proves nothing: never let it open a password account.
+  if (existing?.passwordHash && !process.env.RESEND_API_KEY) throw new GateError("TOKEN_INVALID", 401, "This account uses a password. Sign in with your email and password.");
   if (existing) return existing;
   const [u] = await db.insert(s.users).values({ email: email.toLowerCase(), name: email.split("@")[0], role: "traveller" }).returning();
   return u;

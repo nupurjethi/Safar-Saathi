@@ -180,6 +180,8 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   phoneE164: text("phone_e164"),
+  /** scrypt hash (lib/server/password.ts). Null for demo accounts and email-code accounts. Never returned by any API. */
+  passwordHash: text("password_hash"),
   role: varchar("role", { length: 12 }).notNull().default("traveller"), // traveller | agent | admin
   isDemo: boolean("is_demo").notNull().default(false),
   createdAt: createdAt(),

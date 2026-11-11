@@ -305,3 +305,34 @@ test("8. first page offers travel user and agent login; the agent desk raises an
   await row.getByTestId("resolve-btn").click();
   await expect(page.locator('[data-testid="alert-row"][data-status="closed"]').first()).toBeVisible();
 });
+
+test("9. travel user creates an account with email + password, signs out, signs in again; a wrong password is refused", async ({ page }) => {
+  await page.context().clearCookies();
+  const email = `e2e-${Date.now()}@example.com`;
+  await page.goto("/login?role=traveller");
+  await expect(page.getByTestId("demo-login")).toBeVisible(); // demo stays available
+  await page.getByTestId("tab-create").click();
+  await page.getByTestId("pw-name").fill("Test Traveller");
+  await page.getByTestId("pw-email").fill(email);
+  await page.getByTestId("pw-password").fill("password1"); // 8 characters but too common: the server refuses it
+  await page.getByTestId("pw-submit").click();
+  await expect(page.getByTestId("login-error")).toBeVisible(); // weak password refused
+  await page.getByTestId("pw-password").fill("monsoon-2026!");
+  await page.getByTestId("pw-submit").click();
+  await expect(page).toHaveURL(/\/trips$/);
+  await expect(page.getByText("No trips yet")).toBeVisible({ timeout: 15_000 }); // a new account has no bookings
+  const me = await (await page.request.get("/api/me")).json();
+  expect(me.user.email).toBe(email);
+  expect(JSON.stringify(me)).not.toMatch(/scrypt|passwordHash/);
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.goto("/login?role=traveller");
+  await page.getByTestId("pw-email").fill(email);
+  await page.getByTestId("pw-password").fill("not-my-password");
+  await page.getByTestId("pw-submit").click();
+  await expect(page.getByTestId("login-error")).toContainText("do not match");
+  await page.getByTestId("pw-password").fill("monsoon-2026!");
+  await page.getByTestId("pw-submit").click();
+  await expect(page).toHaveURL(/\/trips$/);
+  await expect(page.getByText("No trips yet")).toBeVisible({ timeout: 15_000 });
+});

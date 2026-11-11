@@ -92,6 +92,10 @@ Flight changes no longer use sample inventory. Ask the agent to move, reschedule
 
 Two domestic itineraries (`bangalore-3n-standard-culture` from Delhi, `bangalore-3n-budget-family` from Mumbai) and a ready demo booking `SS-56001` that starts today, so the trip is "happening now". Open it from the first page ("Demo: Bangalore trip (GPS)"), go to **Map**, tap **Show my location**: the blue dot appears on the real Bengaluru street map (works with no data). If you are outside the saved area the map says so. The tiles cover Cubbon Park, Vidhana Soudha, Lalbagh, Bangalore Palace and the airport road (BLR). 26 cities, 906 saved real routes.
 
+### Travel user sign-in: demo, email + password, email code
+
+The login page offers the demo account, **email + password** (Sign in / Create account tabs, show-password toggle, 8+ characters, common passwords refused) and an email code (collapsed). Passwords are hashed with scrypt and a random salt (`lib/server/password.ts`, no extra dependency); only the hash is stored (`users.password_hash`) and no API returns it. Wrong email, wrong password, demo and staff accounts all give the same message, with a dummy hash run so timing does not reveal which accounts exist; sign-in is rate-limited per email and per IP. With no email key the on-screen email code cannot open a password account. Not built yet: password reset and email verification (both need the `RESEND_API_KEY` email sender). Agent sign-in is still the demo agent.
+
 ### Agent desk and SOS texts
 
 `/agent` is the agent's dashboard: every SOS tap from the app, every text to the helpline number and every help request from the chat appears as an alert (newest and most severe first) with traveller, trip, masked phone, last GPS location (OpenStreetMap link) and a 60 s SLA countdown for emergencies. New alerts raise a red banner, optional alarm sound and browser notification; "Take over" and "Mark resolved" are human-only actions. The first page (`/`) has **Travel user login** and **Agent login** side by side.

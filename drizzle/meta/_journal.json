@@ -15,6 +15,13 @@
       "when": 1794405182157,
       "tag": "0001_curly_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794406458224,
+      "tag": "0002_thick_xorn",
+      "breakpoints": true
     }
   ]
 }
