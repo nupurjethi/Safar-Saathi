@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Safar Saathi: Project Guide</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+* { box-sizing: border-box; }
+body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1a1d21; font-size: 10.4pt; line-height: 1.5; }
+h1 { font-size: 30pt; margin: 0 0 4pt; letter-spacing: -0.5pt; }
+h2 { font-size: 17pt; margin: 22pt 0 6pt; padding-bottom: 4pt; border-bottom: 2.5pt solid #b6e019; break-after: avoid; }
+h3 { font-size: 12pt; margin: 14pt 0 3pt; break-after: avoid; }
+h4 { font-size: 10.6pt; margin: 9pt 0 2pt; color: #3d4a05; break-after: avoid; }
+p { margin: 3pt 0 6pt; }
+ul, ol { margin: 3pt 0 7pt 16pt; padding: 0; }
+li { margin: 1.5pt 0; }
+code { font-family: Menlo, Consolas, monospace; font-size: 8.8pt; background: #f1f3ee; padding: 0.5pt 3pt; border-radius: 3pt; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 9.3pt; break-inside: avoid; }
+th, td { border: 0.6pt solid #cfd4c8; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+th { background: #eef4cf; }
+.cover { padding: 70pt 0 30pt; }
+.tag { display: inline-block; background: #d8fd34; color: #050505; font-weight: 700; padding: 3pt 10pt; border-radius: 12pt; font-size: 9.5pt; }
+.sub { font-size: 13pt; color: #444; margin: 6pt 0 18pt; }
+.box { background: #f6f8ef; border-left: 4pt solid #b6e019; padding: 6pt 10pt; margin: 8pt 0; break-inside: avoid; }
+.warn { background: #fff6e6; border-left-color: #e5a100; }
+.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 4pt; margin: 8pt 0 10pt; break-inside: avoid; }
+.flow div { border: 1pt solid #9aa88a; border-radius: 6pt; padding: 4pt 7pt; background: #fbfcf6; font-size: 9pt; flex: 1 1 22%; }
+.flow b { display: block; color: #3d4a05; font-size: 9.4pt; }
+.arrow { flex: 0 0 auto !important; border: 0 !important; background: none !important; padding: 0 !important; align-self: center; font-size: 13pt; color: #6a7a2a; }
+.pb { break-before: page; }
+.toc li { margin: 2pt 0; }
+.small { font-size: 8.8pt; color: #555; }
+</style></head><body>
+
+<div class="cover">
+  <span class="tag">PROTOTYPE · SAMPLE DATA · TEST PAYMENTS</span>
+  <h1 style="margin-top:16pt">Safar Saathi</h1>
+  <div class="sub">An offline-first travel companion for first-time international travellers from India.<br>Project guide: technology, architecture, data and process flows.</div>
+  <p>Safar Saathi helps a traveller <b>after</b> they have booked: it keeps their plan, map, help guides and SOS working with no internet, an AI agent answers questions and prepares changes, and a human support agent is alerted when something goes wrong. Its main feature turns any set of existing travel documents (PDF, Word, Excel, images) into a complete offline trip.</p>
+  <div class="box"><b>Live site:</b> safar-saathi-five.vercel.app (Vercel) · <b>Source:</b> github.com/nupurjethi/Safar-Saathi · <b>Database:</b> Neon Postgres · <b>AI:</b> Gemini through OpenRouter</div>
+  <h3>Contents</h3>
+  <ol class="toc">
+    <li>What the product does</li>
+    <li>Technology stack at a glance</li>
+    <li>System architecture</li>
+    <li>Front end</li>
+    <li>Back end and API</li>
+    <li>Databases and data model</li>
+    <li>The offline system (how offline storing works)</li>
+    <li>The offline map and routes</li>
+    <li>The Add Travel Plan agent (documents to offline trip)</li>
+    <li>The Trip agent, tools and the Confirm gate</li>
+    <li>Offline assistant and help guides (rule engine)</li>
+    <li>SOS, SMS and the agent desk</li>
+    <li>Flights, hotels and booking-platform handoff</li>
+    <li>Accounts, sessions and security</li>
+    <li>Scroll story and visual design</li>
+    <li>Testing, deployment and operations</li>
+    <li>Known limits and honest boundaries</li>
+    <li>End-to-end user journeys</li>
+  </ol>
+</div>
+
+<h2 class="pb">1. What the product does</h2>
+<p>The product has four jobs, each of which works with or without internet:</p>
+<ul>
+<li><b>Plan:</b> a catalogue of 113 sample itineraries across 26 cities, plus the ability to upload your <i>own</i> bookings and have the app build the trip from them.</li>
+<li><b>Travel offline:</b> every trip is saved on the phone as an offline bundle: day plan with real photos, a real street map with a GPS dot, saved road routes, six validated help guides, emergency contacts, an offline assistant and an SOS that queues until signal returns.</li>
+<li><b>Get help:</b> an online AI Trip agent answers from the booking and prepares changes that only the traveller can confirm; SOS taps and SMS texts open cases on a human agent's desk.</li>
+<li><b>Change plans honestly:</b> flights and hotels are changed on the traveller's own booking platform (MakeMyTrip, Goibibo, Cleartrip, ixigo). Safar Saathi compares sample prices, sends the traveller there to pay, and records the result after a Confirm tap.</li>
+</ul>
+<div class="box warn"><b>Honesty rules built into the product:</b> all catalogue trips, flights, hotels and prices are sample data from our own mock API; no travel site is scraped; the app never asks for or stores a booking-platform password; payments are test payments; offline guidance is predefined, never live information.</div>
+
+<h2>2. Technology stack at a glance</h2>
+<table>
+<tr><th>Layer</th><th>Technology (version)</th><th>Why it is used</th></tr>
+<tr><td>Framework</td><td>Next.js 16 (App Router, Turbopack), React 19, TypeScript</td><td>Server components for fast first load, route handlers for the API, one codebase for web and PWA.</td></tr>
+<tr><td>Styling / UI</td><td>Tailwind CSS 4 with CSS-variable design tokens, Outfit font (next/font), lucide icons</td><td>Neon-green on near-black theme, light and dark modes, mobile-first.</td></tr>
+<tr><td>3D / animation</td><td>Three.js, GSAP + ScrollTrigger, Lenis smooth scroll</td><td>The scroll story: a procedural airliner, a waving cloth banner and cloth trip cards.</td></tr>
+<tr><td>Offline storage</td><td>Service worker (hand-written), Cache Storage, IndexedDB through Dexie 4</td><td>App pages and map files in Cache Storage; trip data, rules and the outbox in IndexedDB.</td></tr>
+<tr><td>Maps</td><td>MapLibre GL 6, PMTiles 4, Protomaps basemap styles (OpenStreetMap data), local fonts and sprites</td><td>A real, Google-Maps-like street map that works offline with GPS.</td></tr>
+<tr><td>Routing</td><td>OSRM public servers (OpenStreetMap routing) at build time; OpenRouteService optional</td><td>Real road and footpath routes with turn-by-turn steps, pre-computed so phones need no routing service.</td></tr>
+<tr><td>Database</td><td>Neon serverless Postgres in production; PGlite (Postgres in WebAssembly) locally and in tests</td><td>Same SQL and schema everywhere; no database needed to run locally.</td></tr>
+<tr><td>ORM / migrations</td><td>Drizzle ORM 0.45 and drizzle-kit (SQL migrations 0000 to 0005)</td><td>Typed queries and versioned schema.</td></tr>
+<tr><td>AI</td><td>Vercel AI SDK 7; Gemini (gemini-3.5-flash) through OpenRouter; Anthropic/OpenAI adapters</td><td>Tool-calling Trip agent, rule drafting and document understanding (text and images).</td></tr>
+<tr><td>Document reading</td><td>unpdf (PDF), mammoth (Word), exceljs (Excel), plain parsing for CSV, HTML, text; images go straight to the model</td><td>Any common travel document can be an input.</td></tr>
+<tr><td>Validation</td><td>Zod 4</td><td>Every API body, every model answer and every rule set is schema-checked.</td></tr>
+<tr><td>Auth</td><td>jose (signed JWT cookie), scrypt password hashing (node:crypto)</td><td>Sessions without an extra auth service; no password stored in plain text.</td></tr>
+<tr><td>SMS</td><td>Twilio REST (API key), polling of inbound texts</td><td>SOS by text when there is cellular signal but no data.</td></tr>
+<tr><td>Testing</td><td>Vitest (unit, ~256 tests), Playwright (end-to-end, 14 tests incl. airplane mode)</td><td>Every claim in the pitch maps to a test.</td></tr>
+<tr><td>Hosting</td><td>Vercel (Pro) for the app; Neon for data; GitHub for source</td><td>Serverless deployment; map files served from the same site.</td></tr>
+</table>
+
+<h2 class="pb">3. System architecture</h2>
+<div class="flow">
+<div><b>Phone / browser (PWA)</b>React UI, service worker, Cache Storage (pages, map files, photos), IndexedDB (trip data, rules, outbox)</div><div class="arrow">⇄</div>
+<div><b>Next.js on Vercel</b>Server-rendered pages, ~40 API route handlers, streaming agent endpoint</div><div class="arrow">⇄</div>
+<div><b>Neon Postgres</b>Catalogue, bookings, packs, rules, plans, cases, generated map tiles</div>
+</div>
+<div class="flow">
+<div><b>Gemini (OpenRouter)</b>Trip agent, rule drafting, reading uploaded documents</div>
+<div><b>OpenStreetMap services</b>Protomaps tile build, Photon geocoder, OSRM routing, Wikimedia Commons photos</div>
+<div><b>Twilio</b>Inbound SOS texts and capped replies</div>
+</div>
+<p><b>Key design idea:</b> the phone never depends on a server to <i>use</i> a trip. The server builds an <b>offline pack</b> (a single JSON document plus a list of files), the phone downloads and verifies it, and from then on every screen reads from the phone's own storage. The server is needed only to download or update the pack, to talk to the AI agent, to confirm changes and to upload SOS cases.</p>
+
+<h3>Repository layout (main folders)</h3>
+<table>
+<tr><td><code>app/</code></td><td>Next.js routes: pages (<code>/</code>, <code>/explore</code>, <code>/itinerary/[slug]</code>, <code>/trips/[ref]/…</code>, <code>/plans/new</code>, <code>/agent</code>, <code>/admin</code>) and <code>app/api/**</code> route handlers.</td></tr>
+<tr><td><code>components/</code></td><td>UI: chat (agent, offline assistant, review/compare/hotel/platform cards), trip screens, map, story, plans, agent desk.</td></tr>
+<tr><td><code>lib/</code></td><td>All logic: <code>db</code>, <code>packs</code>, <code>offline</code>, <code>rules</code>, <code>agent</code>, <code>gate</code>, <code>plans</code>, <code>providers</code>, <code>map</code>, <code>sms</code>, <code>seed</code>, <code>server</code>, <code>story</code>, <code>llm</code>.</td></tr>
+<tr><td><code>public/</code></td><td>Service worker <code>sw.js</code>, map tiles/fonts/sprites, landmark photos, icons.</td></tr>
+<tr><td><code>drizzle/</code></td><td>SQL migrations. <code>scripts/</code>: seed, tile build, route cache, photo fetch.</td></tr>
+<tr><td><code>tests/</code></td><td>Unit and end-to-end tests.</td></tr>
+</table>
+
+<h2 class="pb">4. Front end</h2>
+<h3>4.1 Rendering model</h3>
+<p>Pages use the Next.js App Router. Content that does not depend on the traveller (catalogue, itinerary pages) is rendered on the server. Trip screens are <b>client-rendered shells with no personal data in the HTML</b>: the HTML is identical for everyone, and the data is read from IndexedDB. This is what allows the service worker to cache the page HTML safely and serve it with no network.</p>
+<h3>4.2 Main screens</h3>
+<ul>
+<li><b>Landing (<code>/</code>):</b> visitors see the "How it works" scroll story with Travel user login and Agent login. A signed-in traveller sees Home (the trip catalogue); an agent is redirected to the agent desk.</li>
+<li><b>Explore / itinerary:</b> search by destination, month, budget, theme and tier; itinerary pages show a day-by-day plan, real landmark photos with credits, a real street-map preview with city tabs, a price breakdown and the offline-size estimate.</li>
+<li><b>My trips:</b> trips with photos, "Offline ready" badges, <b>Add travel plan</b> and a delete button (with confirmation) on every trip.</li>
+<li><b>Trip screens (<code>/trips/[ref]/…</code>):</b> Home (hero photos, next plan, pickup card with code, hotel card, local time, weather online), Chat (online Trip agent), Offline (separate offline assistant), Guide (six problem guides), Map, SOS, Log (action log) and Voucher (printable).</li>
+<li><b>Add travel plan (<code>/plans/new</code>):</b> multi-file upload with per-file status and live processing steps.</li>
+<li><b>Agent desk (<code>/agent</code>):</b> live alert list for support staff.</li>
+</ul>
+<h3>4.3 State and data access</h3>
+<p>There is no global state library. A <code>TripProvider</code> loads the saved pack from IndexedDB and runs a quiet background sync whenever the device is online. A network-state hook distinguishes "Online", "Offline pack" (no data, trip saved) and "Signal only". The chat keeps its own local message state; the offline assistant keeps its history in <code>localStorage</code> per trip.</p>
+<h3>4.4 Mobile and accessibility</h3>
+<p>Tap targets are at least 44 px, inputs are 16 px (prevents iOS zoom), fixed bars respect safe-area insets, long names wrap, and horizontal chip rows scroll rather than overflow. Reduced-motion and no-WebGL fallbacks exist for the story.</p>
+
+<h2 class="pb">5. Back end and API</h2>
+<p>The back end is Next.js route handlers running as serverless functions on Vercel (Node runtime). Every handler is wrapped in a common <code>handle()</code> helper that turns typed errors (<code>GateError</code> with a code and HTTP status) into JSON responses, and bodies are validated with Zod.</p>
+<table>
+<tr><th>Area</th><th>Endpoints (examples)</th><th>Purpose</th></tr>
+<tr><td>Auth</td><td><code>/api/auth/demo | register | login | otp | logout</code>, <code>/api/me</code></td><td>Demo login, email + password, email code, session.</td></tr>
+<tr><td>Catalogue</td><td><code>/api/trips/select</code>, <code>/api/trips/[ref]/pay</code>, <code>DELETE /api/trips/[ref]</code></td><td>Select (creates a draft and builds the pack), test payment, delete.</td></tr>
+<tr><td>Offline packs</td><td><code>/api/packs/[ref]/manifest</code>, <code>/api/packs/[bookingId]/pack</code></td><td>The file list with hashes and the pack JSON.</td></tr>
+<tr><td>Travel plans</td><td><code>/api/plans</code>, <code>/api/plans/[id]/files</code>, <code>/api/plans/[id]/process</code>, <code>/api/tiles/[key]</code></td><td>Upload files one by one, stream processing progress, serve generated map files.</td></tr>
+<tr><td>Agent</td><td><code>/api/agent</code> (NDJSON stream)</td><td>Tool-calling Trip agent with live step chips.</td></tr>
+<tr><td>Change gate</td><td><code>/api/confirmations</code>, <code>/api/mock/v1/changes/apply</code>, <code>/api/trips/[ref]/external-change</code>, <code>/external-hotel-change</code></td><td>Quote, Confirm token, apply, record platform bookings.</td></tr>
+<tr><td>Mock travel API</td><td><code>/api/mock/v1/flights/search</code>, <code>/stays/availability</code>, <code>/quotes</code>, <code>/bookings/[ref]</code></td><td>Our own sample partner API.</td></tr>
+<tr><td>Help</td><td><code>/api/cases</code>, <code>/api/sos</code>, <code>/api/sms/inbound</code>, <code>/api/agent/alerts</code>, <code>/api/cron/sms-poll</code></td><td>SOS upload, SMS, agent-desk feed.</td></tr>
+<tr><td>Platforms</td><td><code>/api/providers/connect</code></td><td>Remembers which booking platform the traveller says they are logged in to.</td></tr>
+</table>
+<h3>Cross-cutting server pieces</h3>
+<ul>
+<li><b>Rate limiting:</b> a sliding-window limiter per user or IP (in memory per serverless instance; adequate for a prototype, swap for Redis in production).</li>
+<li><b>Security headers:</b> a strict Content-Security-Policy (own origin only, plus blob storage and workers), no framing, nosniff, referrer policy, geolocation limited to self.</li>
+<li><b>Single LLM module:</b> every model call lives in <code>lib/llm/index.ts</code> (model choice, logging, retries, test hook). A test fails the build if any other file imports an AI SDK.</li>
+</ul>
+
+<h2 class="pb">6. Databases and data model</h2>
+<h3>6.1 Which databases</h3>
+<ul>
+<li><b>Neon (serverless Postgres):</b> production data. The app connects with the Neon serverless driver over WebSocket pooling, which supports transactions.</li>
+<li><b>PGlite:</b> a real Postgres compiled to WebAssembly, used when <code>DATABASE_URL</code> is empty. Local development, the end-to-end tests and the unit tests (in-memory) all run on it with the same schema and queries. This is why the project runs with no keys.</li>
+<li><b>IndexedDB (on the phone, through Dexie):</b> the traveller's offline copy: trips, pack versions, rule sets, per-file records, and the outbox of queued SOS cases and chat messages.</li>
+<li><b>Cache Storage (on the phone):</b> pages, scripts, map files, photos.</li>
+</ul>
+<h3>6.2 Main tables (Drizzle schema, ~35 tables)</h3>
+<table>
+<tr><th>Group</th><th>Tables</th><th>Holds</th></tr>
+<tr><td>Catalogue (mock API)</td><td>destinations, pois, hotels, flights, room_inventory, transfers, itineraries, itinerary_days, mock_hotels, partner_markups</td><td>26 cities, real landmarks with coordinates and licensed photo credits, fictional hotels, ~100,000 generated flights, room inventory, 113 itineraries, per-platform price rules.</td></tr>
+<tr><td>People</td><td>users (role traveller | agent | admin, password hash), login_codes, travellers</td><td>Accounts and the people on a trip.</td></tr>
+<tr><td>Trips</td><td>bookings (source catalogue | upload), booking_items, payments, trip_drafts, trip_versions</td><td>A trip, its flights, hotels, transfers and activities as items, payments (including recorded external ones).</td></tr>
+<tr><td>Uploaded plans</td><td>travel_plans, plan_files, map_tiles</td><td>The extracted plan, files' text (deleted after processing), generated PMTiles bytes.</td></tr>
+<tr><td>Offline</td><td>offline_packs (pack JSON + manifest + version), rule_sets, rule_validations</td><td>Versioned bundles and the validated help guides with their check results.</td></tr>
+<tr><td>Agent + gate</td><td>agent_threads, agent_messages, tool_calls, change_quotes, price_breakups, confirmations</td><td>Chat history, an audit log of every tool call, quotes with hashes, single-use confirmation tokens (hash only).</td></tr>
+<tr><td>Safety</td><td>cases, sms_messages, sos_cases_local_sync, events</td><td>Help cases with SLA, SMS in/out, offline-SOS de-duplication, analytics events.</td></tr>
+<tr><td>Integrations</td><td>provider_offers, provider_connections, llm logging via events</td><td>Provider offers, "logged in to" notes.</td></tr>
+</table>
+<h3>6.3 Seeding and determinism</h3>
+<p>The catalogue is generated by a seeded random generator (<code>lib/seed</code>) so every environment gets identical data. Bangalore draws from its own random stream so adding it did not change any other city. <code>npm run db:reset</code> drops the schema, migrates and reseeds (about two minutes on Neon). Demo accounts: a demo traveller, a demo support agent and an admin.</p>
+
+<h2 class="pb">7. The offline system (how offline storing works)</h2>
+<div class="box"><b>Principle:</b> select first, pay later. The moment a traveller selects a trip, the whole offline bundle is built and saved on the phone, before any payment.</div>
+<h3>7.1 What is stored and where</h3>
+<table>
+<tr><th>Item</th><th>Stored in</th><th>Detail</th></tr>
+<tr><td>Trip data (the "pack")</td><td>IndexedDB <code>tripPacks</code></td><td>One JSON document: booking, days, places (with coordinates and photo credits), stays, flights, contacts, saved routes with steps, map references.</td></tr>
+<tr><td>Help guides</td><td>IndexedDB <code>rulesets</code></td><td>Validated decision trees for six scenarios, filled with the trip's own facts.</td></tr>
+<tr><td>Map files (PMTiles)</td><td>Cache Storage <code>ss-trip-{ref}-v{n}</code></td><td>Overview + street-level core files per city (5 to 28 MB each).</td></tr>
+<tr><td>Landmark photos</td><td>Same per-trip cache</td><td>Openly licensed photos with credit text.</td></tr>
+<tr><td>Fonts, icons, map worker</td><td>Cache Storage <code>ss-shell-v2</code></td><td>Shared by every trip (about 3.4 MB).</td></tr>
+<tr><td>App pages and JavaScript</td><td><code>ss-shell-v2</code> and <code>ss-static-v1</code></td><td>Trip pages (home, chat, offline, guide, map, SOS, log, voucher), My trips, Explore, Add plan and every JS/CSS chunk they need.</td></tr>
+<tr><td>Queued SOS and chat</td><td>IndexedDB <code>outbox</code></td><td>Sent automatically when the device is back online; idempotent by local id.</td></tr>
+<tr><td>Bookkeeping</td><td>IndexedDB <code>trips</code>, <code>fileRecs</code></td><td>Active version, per-file hash and size so interrupted downloads resume.</td></tr>
+</table>
+<h3>7.2 Building the pack (server)</h3>
+<ol>
+<li>Resolve the booking items (flights, hotels, transfers, activities) and the destination data.</li>
+<li>Build places, day-by-day items with local times in each city's time zone, stays, flights and contacts.</li>
+<li>Compute saved routes (airport to hotel both ways, hotel to each landmark) from the pre-built real-route cache.</li>
+<li>List the map tiles, fonts, photos and pages; compute each file's size and SHA-256.</li>
+<li>Draft the six help guides with the LLM (or fall back to templates), validate them (section 11), freeze them.</li>
+<li>Hash the whole content; if unchanged from the last version, no new version is created; otherwise store version n+1.</li>
+</ol>
+<h3>7.3 Downloading the pack (phone): the sync algorithm</h3>
+<div class="flow">
+<div><b>1 Manifest</b>fetch file list + hashes</div><div class="arrow">→</div>
+<div><b>2 Details</b>pack JSON, verify content hash</div><div class="arrow">→</div>
+<div><b>3 Maps &amp; photos</b>each file hash-checked</div><div class="arrow">→</div>
+<div><b>4 Pages</b>HTML + every chunk via the service worker</div><div class="arrow">→</div>
+<div><b>5 Atomic swap</b>flip active version, delete old</div>
+</div>
+<ul>
+<li><b>Order:</b> trip data and guides first, so the guide works before the maps finish.</li>
+<li><b>Integrity:</b> a file is written to the cache only after its SHA-256 matches; a bad file throws and writes nothing.</li>
+<li><b>Resume and reuse:</b> every verified file is recorded immediately; an interrupted download resumes; files unchanged since the previous version are copied from the old cache instead of downloaded.</li>
+<li><b>Atomic swap:</b> all new files go under version n+1; the active version flips in one IndexedDB transaction only after everything verified. If anything fails the previous version stays active and usable.</li>
+<li><b>Budget:</b> 80 MB per trip by default; over budget offers "download maps over Wi-Fi".</li>
+<li><b>Self-healing:</b> on every online arrival the app re-checks that every saved page, map file, photo and font still exists (iOS can delete storage) and re-downloads only what is missing, even when the pack itself is unchanged.</li>
+<li><b>Update downloads bypass the saved copy:</b> downloads carry <code>?ss-refresh=1</code> so the service worker does not answer from the old cached file (otherwise an updated map could never replace an old one).</li>
+</ul>
+<h3>7.4 The service worker (<code>public/sw.js</code>)</h3>
+<ul>
+<li><b>Pages:</b> network-first with a 4-second timeout, falling back to the saved copy of the page; unknown pages fall back to a friendly <code>/offline</code> page listing the saved trips.</li>
+<li><b>Static assets (<code>/_next/static/*</code>):</b> cache-first (hashed, immutable). When saving a page, the worker scans its HTML and then every chunk's text for <code>static/chunks/…</code> references, so lazily loaded code (like the map) is saved too.</li>
+<li><b>Map files (<code>.pmtiles</code>, <code>/map/</code>, <code>/places/</code>):</b> served from the caches with HTTP <b>Range</b> support. PMTiles reads only small ranges; the worker slices the cached file to answer.</li>
+<li><b>API calls:</b> never cached (authenticated data). Next.js client-side route fetches are not intercepted; offline the app uses a full page load instead (<code>SafeLink</code>), which the worker serves from the saved pages.</li>
+<li><b>Versioned caches:</b> per-trip namespaces <code>ss-trip-{ref}-v{n}</code> so deleting a trip removes only its own files.</li>
+</ul>
+<h3>7.5 Network states and honesty</h3>
+<p>The header always shows the network state. SMS needs cellular signal and does not work in airplane mode; GPS works with no data; offline limits (no live traffic, no address search, navigation pauses in the background) are said plainly in the UI.</p>
+<h3>7.6 Device-specific caveats</h3>
+<p>On iOS the installed Home Screen app has storage separate from Safari: the trip must be downloaded inside the installed app after signing in there. iOS may evict stored data under pressure; the self-healing check repairs this the next time the app is opened online.</p>
+
+<h2 class="pb">8. The offline map and routes</h2>
+<h3>8.1 Tiles</h3>
+<ul>
+<li>Source: the daily <b>Protomaps</b> planet build (OpenStreetMap vector tiles). The <code>pmtiles</code> CLI extracts a bounding box with HTTP range requests, so no bulk download from tile.openstreetmap.org (forbidden by its usage policy).</li>
+<li>Two files per city: an <b>overview</b> (whole city and airport, zoom 0 to 12; 14 for Bangalore) and a <b>core</b> file (hotels and landmarks, street level to zoom 15). All 26 cities total about 250 MB on disk; a two-city trip stores about 30 to 45 MB.</li>
+<li>The core bounding box is stored in the tile manifest, so the server never opens the large files at run time.</li>
+<li><b>Generated tiles:</b> for a city in an uploaded plan that we do not cover, the server builds a small PMTiles v3 file in-process (reads only the needed tiles from the public build, re-packs them, serves it from <code>/api/tiles/&lt;key&gt;.pmtiles</code>, stores it in Neon).</li>
+</ul>
+<h3>8.2 Style and rendering</h3>
+<p>MapLibre GL draws the style produced by <code>lib/map/style.ts</code> from Protomaps layers (roads with casings, buildings, parks, water, rail, one-way arrows, street names, POI icons). The style uses only local URLs: tiles from the cached PMTiles, glyphs from <code>/map/fonts</code> and icons from <code>/map/sprites</code>, so nothing calls the network offline. Core layers draw on top from zoom 13 and hide the coarser overview underneath. Light and dark styles are tuned for contrast.</p>
+<h3>8.3 Pins, routes and GPS</h3>
+<ul>
+<li><b>Pins:</b> teardrop markers for hotel (H), airport and numbered landmarks; the traveller's position is a neon-green dot with dark rings, a pulse and an accuracy circle.</li>
+<li><b>Routes:</b> real road and footpath geometry plus turn-by-turn steps, pre-computed from OSRM into <code>lib/seed/route-cache.json</code> (954 routes) and saved in the pack. An off-route detector warns when the traveller is more than 40 m away for 10 seconds.</li>
+<li><b>GPS:</b> the browser Geolocation API works with no data. "Start navigating" keeps the screen awake while the page is visible.</li>
+</ul>
+
+<h2 class="pb">9. The Add Travel Plan agent (documents to offline trip)</h2>
+<p>This is the main agent: a traveller uploads whatever they already have and the backend produces the complete offline bundle from it.</p>
+<div class="flow">
+<div><b>1 Upload</b>up to 12 files, 4 MB each, one request per file</div><div class="arrow">→</div>
+<div><b>2 Read</b>text from PDF/Word/Excel/CSV/HTML; images kept</div><div class="arrow">→</div>
+<div><b>3 Gemini</b>one multimodal call to a strict JSON plan</div><div class="arrow">→</div>
+<div><b>4 Geocode</b>find every place</div><div class="arrow">→</div>
+<div><b>5 Maps</b>reuse or generate tiles</div><div class="arrow">→</div>
+<div><b>6 Trip + pack</b>booking, routes, guides, SOS</div>
+</div>
+<h4>Step 1 and 2: uploading and reading</h4>
+<p>The browser creates a plan (<code>POST /api/plans</code>), then posts each file separately (<code>/api/plans/[id]/files</code>) so every request stays within the serverless body limit and each file shows its own status. <code>lib/plans/parse.ts</code> extracts text with <code>unpdf</code>, <code>mammoth</code>, <code>exceljs</code> (every sheet as rows) or direct decoding; photos and screenshots become data URLs the model reads directly. Scanned PDFs with no text are reported ("upload a photo instead"); unsupported types are skipped with a reason. Only text and images are stored, and only until processing ends.</p>
+<h4>Step 3: Gemini extraction</h4>
+<p><code>lib/plans/extract.ts</code> sends all texts and images in one call with strict instructions: use only facts in the documents, never guess phone numbers, booking codes or times; local date-times; IATA codes; time zones; hotels, activities, transfers, contacts. The JSON is normalised (upper-case codes, empty strings removed) and validated with Zod (<code>lib/plans/schema.ts</code>); on failure it retries once with the validation errors. Plain-English <b>warnings</b> (no hotel phone, no flights found) are produced and shown to the user.</p>
+<h4>Step 4: finding places on the map</h4>
+<p><code>lib/plans/geo.ts</code> looks first in our own data (seeded airports, cities, landmarks), then asks the public <b>Photon</b> OpenStreetMap geocoder (one request per second, results kept only if near the city). A place not found gets no pin and a warning; the app never guesses coordinates.</p>
+<h4>Step 5: offline street map</h4>
+<p>Cities we already cover reuse our pre-built tiles; any other city gets a map file generated at that moment (section 8.1). Goa, Kyoto and Osaka were built this way: 3 to 5 MB each in 15 to 40 seconds.</p>
+<h4>Step 6: trip and bundle</h4>
+<p>A booking with <code>source = "upload"</code> is created, with flight and hotel items. <code>lib/plans/pack.ts</code> builds the same offline pack as a catalogue trip: day plan from the documents' dates and items, pins, real routes (live OSRM for new places), stays, drivers and pickup codes from the transfers, contacts, emergency numbers, six validated guides and the map references. The documents' text and images are then deleted. A plan with no flights (for example a rail itinerary) still builds, with "not in your documents" placeholders.</p>
+<div class="box"><b>Typical timing (live test):</b> reading with Gemini 13 to 35 s, finding places 10 s, generating one city map 15 to 40 s, building the bundle a few seconds; about 1.5 minutes in total, inside the 5-minute function limit on Vercel Pro.</div>
+
+<h2 class="pb">10. The Trip agent, tools and the Confirm gate</h2>
+<h3>10.1 The agent</h3>
+<p>The online Trip agent is a tool-calling model (Gemini through OpenRouter, via the AI SDK). It answers only from tool results. It streams NDJSON events to the browser: thread id, step chips (which tool is running), text deltas, cards (review, compare, hotels, platforms, case, route) and a final label. Without an API key a deterministic "demo agent" runs the same tools through the same gate and is labelled in the UI.</p>
+<table>
+<tr><th>Tool</th><th>What it does</th></tr>
+<tr><td>get_itinerary</td><td>Reads the trip: next plans, pickup, hotel, local time, flights with ids.</td></tr>
+<tr><td>get_route</td><td>Returns a saved route and steps; shows an "Open on map" card.</td></tr>
+<tr><td>compare_flights / compare_hotels</td><td>Compares prices (official APIs when keys exist, otherwise our mock partner API in Neon) with a per-platform price for each option.</td></tr>
+<tr><td>connect_platform</td><td>Shows the four-platform picker and the form to record a booking.</td></tr>
+<tr><td>quote_change / apply_change</td><td>Price a change and apply it; apply needs a valid Confirm token (see below).</td></tr>
+<tr><td>search_web</td><td>Travel information with cited sources (Tavily/Brave when configured); never a booking price.</td></tr>
+<tr><td>escalate_human</td><td>Opens a case for a person (severity from a rule-based rubric); the agent can never close a case.</td></tr>
+<tr><td>send_sms</td><td>Short SMS to the traveller (max 160 characters, capped).</td></tr>
+</table>
+<p>A test asserts there is <b>no tool that can mint a confirmation token</b>, and that the model's allow-list excludes server-only jobs.</p>
+<h3>10.2 The Confirm gate (nothing changes without the traveller)</h3>
+<ol>
+<li><b>Quote:</b> the server computes the change and the price breakup; a hash of the quote (kind, parameters, before/after, price lines) is stored.</li>
+<li><b>Review card:</b> the traveller sees before/after, the price breakup, the source ("Sample data" or "Entered by you") and Yes / No.</li>
+<li><b>Confirm tap:</b> an authenticated request mints a single-use token; only its hash is stored; it expires quickly.</li>
+<li><b>Apply:</b> requires the token; it is claimed atomically; the quote hash is re-checked; the price is re-computed from live data. If it moved, the old quote is voided and a new review card is shown (HTTP 409).</li>
+<li><b>Mutate and refresh:</b> items are replaced in one transaction, payments recorded, then the offline pack is rebuilt (only the affected guide scenarios are redrafted) and the phone re-syncs.</li>
+<li><b>Limits:</b> changes above a price limit are blocked and escalated to a person; changes within 3 hours of departure are refused.</li>
+</ol>
+<p>Four change kinds go through the same gate: <code>flight_change</code> and <code>hotel_extend</code> (sample inventory, API only), and <code>flight_external</code> / <code>hotel_external</code> (a booking the traveller already made on a platform, recorded after Confirm; no price limit because Safar Saathi charges nothing).</p>
+
+<h2>11. Offline assistant and help guides (rule engine)</h2>
+<h3>11.1 The six guides</h3>
+<p>Flight delayed, missed connection, hotel not found, transfer no-show, lost passport and medical help. Each is a short decision tree with steps filled from the trip's own data (hotel address in the local script for a driver, emergency numbers, consulate, pickup code, flight numbers).</p>
+<h3>11.2 Drafted once, validated, then frozen</h3>
+<ol>
+<li>When facts change, only the affected scenarios are redrafted by the LLM (one call, JSON only).</li>
+<li><b>Seven validators</b> run: schema (unknown fields fail), references (every <code>{{template}}</code> resolves in every city of the trip), coverage, no invented facts, length and tone, local script present, safety.</li>
+<li>One retry with the error list; if it still fails, a <b>template rule set</b> labelled "Standard guide, not personalised yet" is used.</li>
+<li>The validated set is stored, frozen and shipped to the phone. A tiny interpreter (under 5 KB) walks it offline. <b>No model and no network are used offline.</b></li>
+</ol>
+<h3>11.3 The offline assistant (separate chat)</h3>
+<p><code>/trips/[ref]/offline</code> is its own chat with its own history on the phone, not mixed with the online agent. It is a pure rule-based answerer (<code>lib/offline/assistant</code>): about 31 intents with typo tolerance and a few Hinglish phrases, answers read only from the saved pack (hotel, flights, pickup, today's plan, emergency numbers, per-country basics, the six guides), always citing the source item. When unsure it says "I can't answer that offline", and for changes it says they need a connection and the Confirm tap. A question can be queued for the online agent.</p>
+
+<h2 class="pb">12. SOS, SMS and the agent desk</h2>
+<h3>12.1 SOS from the app</h3>
+<p>The SOS screen shows the address card in the local script, emergency numbers and the SOS button. Tapping it while offline saves the case in the IndexedDB outbox with the last known GPS position; when connectivity returns it uploads (<code>/api/cases</code>), de-duplicated by the phone's local id, and the traveller sees the server case reference.</p>
+<h3>12.2 SOS by text message</h3>
+<ol>
+<li>The traveller texts the helpline number (Twilio) e.g. "SOS lost passport SS-48213". SMS needs cellular signal, not data.</li>
+<li>A local server has no public webhook URL, so the server <b>reads the text from Twilio</b> by polling Twilio's message list (a free read) whenever an agent desk is open, or from a cron route.</li>
+<li>The same handler as the webhook runs: severity rubric, booking matched by sender number or by the booking reference in the text; unknown senders still raise an alert.</li>
+<li>A case is opened (severity 1 gets a 60-second SLA) and a short reply (160 characters) is sent.</li>
+<li><b>Message budget:</b> every real outbound SMS is counted in the database and refused after a cap (default 5), because trial accounts have few messages.</li>
+</ol>
+<h3>12.3 The agent desk (<code>/agent</code>)</h3>
+<p>Support staff sign in as agent (demo account for now). The desk refreshes every 5 seconds from <code>/api/agent/alerts</code> and shows each alert with severity, channel (SOS from app, SMS, help request from chat), the traveller and masked phone, the trip, the last GPS location (OpenStreetMap link) and an SLA countdown. New alerts raise a red banner, an optional alarm sound and a browser notification. "Take over" and "Mark resolved" are human-only actions.</p>
+
+<h2>13. Flights, hotels and booking-platform handoff</h2>
+<h3>13.1 What is and is not possible</h3>
+<div class="box warn">MakeMyTrip, Goibibo, Cleartrip and ixigo give other apps <b>no sign-in, no price feed and no booking API</b> (their APIs are for contracted business partners). So Safar Saathi does not log in to them, read their prices or take payment, never asks for passwords, and never scrapes them. Real in-app booking would need a partner agreement and an official adapter.</div>
+<h3>13.2 The flow implemented</h3>
+<ol>
+<li>At the top of the chat the traveller picks <b>"I'm logged in to"</b> one platform (a self-declared note stored in <code>provider_connections</code>).</li>
+<li>For "move my flight" or "extend my stay" the agent runs a comparison. Prices come from the <b>mock partner API stored in Neon</b>: seeded flights and room inventory plus flights and hotels generated deterministically for new routes or cities and stored once; <code>partner_markups</code> turns one base price into a price per platform (markup, discount and fee). Every price is labelled as sample data. If an official API key (Amadeus or Duffel) is configured, live fares are used instead.</li>
+<li>The comparison card shows ranked options; the primary button is <b>"Pay on &lt;your platform&gt;"</b>, which opens that site (flights pre-filled; hotels open the hotel page with the city and dates shown to copy). The traveller logs in and pays there.</li>
+<li>Back in the app they press "I have paid: record my booking", check the pre-filled form (flight number, times, PNR, amount; or new check-out / chosen hotel), and review the Confirm card. Only their Yes updates the trip, totals and offline guide.</li>
+</ol>
+
+<h2 class="pb">14. Accounts, sessions and security</h2>
+<ul>
+<li><b>Login options:</b> demo traveller, email + password (create account / sign in), email code (collapsed), demo agent and admin.</li>
+<li><b>Passwords:</b> scrypt with a random 16-byte salt (<code>node:crypto</code>), only the hash is stored and is never returned by any API; weak or common passwords are refused; one generic error for every sign-in failure and a dummy hash run so timing does not reveal which accounts exist; rate limits per email and per IP.</li>
+<li><b>Sessions:</b> a signed JWT (HS256, <code>jose</code>) in an httpOnly, SameSite cookie, 30 days.</li>
+<li><b>Authorization:</b> every trip API checks the booking belongs to the session; staff routes require agent or admin; traveller-only routes (plans, delete) require the traveller role.</li>
+<li><b>Data minimisation:</b> uploaded documents are deleted after processing; phone numbers are masked in staff views; SMS bodies are purged after 30 days by a cron route.</li>
+<li><b>Honest labelling:</b> sample data, test payments and stubbed integrations are labelled in the UI and the README; demo mode switches exist and must be turned off for a real launch.</li>
+</ul>
+
+<h2>15. Scroll story and visual design</h2>
+<p>The landing page is a scroll-driven story built with <b>Three.js</b> (one shared stage), <b>GSAP ScrollTrigger</b> (pinned sections and scrubbed timelines) and <b>Lenis</b> (smooth scrolling). The airliner is built entirely in code: a lathe-turned fuselage with a livery texture, lofted swept wings and winglets, tailplane and fin, engines, gear and lights. The hero banner is a cloth-simulated pennant (40x14 vertex mesh with travelling waves, shaded folds, reaction to scroll speed); the trip decks wrap over the cabin roof, slide off along a curve while rippling, and settle flat and static in front. The flight path never descends. Reduced motion and no-WebGL users get a plain layout.</p>
+<p>The theme is neon green (#d8fd34) on near-black (#050505) with Outfit, pill buttons and a pill navigation bar, driven by CSS variables so light and dark themes share one set of tokens.</p>
+
+<h2 class="pb">16. Testing, deployment and operations</h2>
+<h3>16.1 Tests</h3>
+<ul>
+<li><b>Unit (Vitest, ~256 tests):</b> seed determinism and counts, the gate (no token, reused, expired, foreign, tampered, price move, over limit), rule engine and validators, severity rubric, off-route detector, offline sync (with a fake IndexedDB and Cache API), agent tools and demo agent, Twilio budget and polling (mocked), the plan parser, schema and full plan-to-pack agent, partner pricing, map style (no remote URLs), cloth maths, accounts and password hashing, trip deletion, "no scraping" checks, and that all 113 itineraries select, pay and build a complete bundle.</li>
+<li><b>End to end (Playwright, 14 tests, Pixel 7 profile):</b> explore, select, offline guide ready, airplane-mode guide/map/SOS with no failed requests, the neon GPS dot placement, platform compare and record, the Confirm gate, SMS to an agent-desk alert, the offline chat, sign-up and sign-in, plan upload, offline page switching and self-healing, deleting a trip. E2E runs on a production build with an isolated local database, and its configuration forces empty database and Twilio settings so a test can never touch production data or send a real SMS.</li>
+</ul>
+<h3>16.2 Deployment</h3>
+<ul>
+<li>Source on GitHub; deployed with the Vercel CLI to a Pro team (the app has about 60 server routes, above the free plan's 12-function limit).</li>
+<li>Environment variables (database, AI key, Twilio, auth and cron secrets, demo-mode flags, price limit) are set in the Vercel project. Next.js file tracing is configured so runtime-read files (route cache, tile manifest, photos, fonts) ship with the functions.</li>
+<li>The large map files (~250 MB) are not in git; they are uploaded with the deployment from the local folder (or can move to blob storage).</li>
+<li>Database changes: generate a migration with drizzle-kit, apply it to Neon with <code>drizzle-kit migrate</code>; <code>db:reset</code> reseeds.</li>
+</ul>
+<h3>16.3 Data pipelines (run occasionally)</h3>
+<table>
+<tr><td><code>npm run images:fetch</code></td><td>Downloads openly licensed Commons photos (CC BY, CC BY-SA, CC0, PD) via the official APIs, keeps author and licence, with a hand-reviewed reject list.</td></tr>
+<tr><td><code>npm run tiles:build</code></td><td>Extracts overview and core PMTiles for all cities (needs the pmtiles CLI).</td></tr>
+<tr><td><code>npm run map:assets</code></td><td>Downloads label fonts and POI sprites (Protomaps assets).</td></tr>
+<tr><td><code>npm run routes:cache</code></td><td>Pre-computes real routes from OSRM (one request per second, resumable).</td></tr>
+</table>
+
+<h2>17. Known limits and honest boundaries</h2>
+<ul>
+<li>All catalogue content (hotels, flights, prices, transfers) is <b>sample data</b>; landmarks, coordinates and photos are real.</li>
+<li>Payments are test payments. No booking, change or cancellation happens on any real platform; the traveller does that and records it.</li>
+<li>Offline limits: no live traffic or transit, no address search, no re-routing on the phone, no background navigation in a PWA; iOS may evict stored data (the app repairs it when online); SMS needs cellular signal.</li>
+<li>Uploaded-plan quality depends on the documents: scanned PDFs without text need a photo; anything not printed in the documents is left blank and flagged; guides for uploaded plans currently use the standard template when the AI draft does not pass validation.</li>
+<li>Rate limiting is per serverless instance; the agent-desk login is a demo account; password reset and email verification need an email sender key; the in-memory SMS poll throttle is per instance.</li>
+<li>Third-party services used politely and for build time or low volume: Photon geocoder, OSRM routing, Protomaps build, Wikimedia Commons. For heavy production use they should be replaced with contracted or self-hosted equivalents.</li>
+</ul>
+
+<h2>18. End-to-end user journeys</h2>
+<h4>A. Browse, select and travel (catalogue)</h4>
+<ol>
+<li>Visitor lands on the story, signs in (demo or email + password).</li>
+<li>Searches the catalogue, opens an itinerary (photos, day plan, real map preview, price, offline size).</li>
+<li>Taps Select: server creates a draft booking and builds the pack; the phone downloads and verifies it; "Offline guide ready".</li>
+<li>Pays (test payment) when ready; the booking is confirmed.</li>
+<li>Travels: day plan, map with GPS, guides and SOS work offline; the offline assistant answers from the saved bundle.</li>
+</ol>
+<h4>B. Add an existing travel plan</h4>
+<ol>
+<li>Taps Add travel plan, chooses several files of any supported format.</li>
+<li>Watches the steps: reading with Gemini, finding places, making the offline street map, creating the trip, building the guide.</li>
+<li>Reviews the "Please check" warnings and opens the trip; the bundle downloads to the phone; everything works offline.</li>
+</ol>
+<h4>C. Change a flight or hotel</h4>
+<ol>
+<li>Chooses "I'm logged in to Goibibo" in the chat, asks "move my flight later".</li>
+<li>Agent shows ranked sample fares with each platform's price; taps "Pay on Goibibo", pays there.</li>
+<li>Records the booking, reviews the card, taps Yes; the trip, totals and offline guide update.</li>
+</ol>
+<h4>D. Emergency</h4>
+<ol>
+<li>No data: the traveller opens the SOS screen (address card, emergency numbers) and taps SOS; or sends a text to the helpline.</li>
+<li>The case reaches the Neon database when connectivity returns (app) or when the server reads the text (SMS).</li>
+<li>The agent desk raises a red alert with the traveller, trip and location; a human takes over and resolves it.</li>
+</ol>
+<p class="small">Document generated from the project's source and README. Figures such as test counts, file sizes and timings are from the latest builds and live tests and will change as the project evolves.</p>
+</body></html>

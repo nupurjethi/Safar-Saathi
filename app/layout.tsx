@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   applicationName: "Safar Saathi",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Safar Saathi", statusBarStyle: "black-translucent" },
-  icons: { icon: "/icons/icon.svg", apple: "/icons/icon-192.png" },
+  icons: { icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }, { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }], apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }] },
 };
 export const viewport: Viewport = { themeColor: "#050505", width: "device-width", initialScale: 1, viewportFit: "cover" };
 

@@ -69,9 +69,9 @@ export function Cursor() {
   );
 }
 
-export function LogoMark({ className = "" }: { className?: string }) {
+export function LogoMark({ className = "", color = "#d8fd34" }: { className?: string; color?: string }) {
   return (
-    <svg viewBox="0 0 64 40" className={className} fill="none" stroke="#d8fd34" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg viewBox="0 0 64 40" className={className} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M4 22 L58 4 L40 36 L31 23 Z" />
       <path d="M31 23 L58 4" />
       <path d="M31 23 L33 33" />

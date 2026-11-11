@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { NetworkBadge } from "./NetworkBadge";
+import { LogoMark } from "@/components/story/parts";
 import { flushSos } from "@/lib/offline/outbox";
 import { useNetwork } from "@/lib/offline/network-state";
 
@@ -55,8 +56,9 @@ export function AppShell({ children, signedIn = false }: { children: React.React
     <div className="flex min-h-dvh flex-col">
       <header className="no-print sticky top-0 z-40 px-3 pt-3 pt-safe sm:px-4 sm:pt-4">
         <div className="mx-auto flex max-w-6xl items-center gap-3 rounded-full border border-line bg-bg/70 py-2 pl-5 pr-2 backdrop-blur-xl">
-          <Link href="/" className="inline-flex min-h-11 items-center font-display text-[20px] font-bold tracking-tight">
+          <Link href="/" className="inline-flex min-h-11 items-center gap-2 font-display text-[20px] font-bold tracking-tight" aria-label="Safar Saathi home">
             safar<span className="text-accent">saathi</span>
+            <LogoMark className="h-5 w-8" color="var(--accent)" />
           </Link>
           <span className="hidden items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-[12px] font-medium uppercase tracking-wide text-muted lg:inline-flex" title="All trips, prices, flights and hotels are sample data from our own mock travel API."><span aria-hidden className="size-1.5 rounded-full bg-lime" />Sample data · test payment</span>
           <nav aria-label="Primary" className="ml-4 hidden items-center gap-6 text-[14px] font-medium sm:flex [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center">
