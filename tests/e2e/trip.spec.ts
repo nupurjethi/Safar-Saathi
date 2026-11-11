@@ -100,17 +100,44 @@ test("1. Explore → select → guide ready → offline guide/map/address card/S
   await page.getByTestId("go-trip").click();
   await expect(page.getByTestId("draft-banner")).toHaveCount(0);
 
-  // 7-8. agent: option list with price breakups, Yes on one
+  // 7-8. flight change: no sample flights. The agent sends the traveller to their own booking platform, then records the new flight through the Confirm gate
   await page.goto(`/trips/${ref}/chat`);
-  const card = await askForCard(page, "Please move my flight later");
-  await expect(card.getByTestId("breakup")).toBeVisible();
-  expect(await card.getByTestId("breakup-line").count()).toBeGreaterThanOrEqual(2);
-  await expect(card.getByTestId("offer-source")).toContainText("Sample data (mock API)");
-  const flights = (await card.innerText()).match(/\b[A-Z]{2}\d{3}\b/g) ?? [];
-  const newFlight = flights[1];
-  expect(newFlight).toBeTruthy();
+  await ask(page, "Please move my flight later");
+  const pc = page.getByTestId("platform-card").last();
+  await expect(pc).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("assistant-text").last()).toContainText("never see your password");
+  await expect(pc.getByTestId("platform-row")).toHaveCount(4);
+  for (const name of ["MakeMyTrip", "Goibibo", "Cleartrip", "ixigo"]) await expect(pc.getByTestId("platform-list")).toContainText(name);
+  const href = await pc.getByTestId("platform-open").first().getAttribute("href");
+  expect(href).toMatch(/^https:\/\//);
+  expect(await pc.getByTestId("platform-open").first().getAttribute("target")).toBe("_blank");
+  await pc.getByTestId("platform-mark").first().click(); // "I am logged in on this site" (self-declared)
+  await expect(pc.getByTestId("platform-row").first()).toContainText("Logged in");
+  // bad details are refused with a plain message
+  await pc.getByTestId("pf-carrier").fill("Air India");
+  await pc.getByTestId("pf-flightno").fill("AI 143");
+  await pc.getByTestId("pf-pnr").fill("1");
+  await pc.getByTestId("pf-submit").click();
+  await expect(pc.getByTestId("pf-error")).toBeVisible();
+  // good details: shift the shown times by 3 hours (local strings), enter a PNR and the amounts paid on the platform
+  const shift = (v: string) => { const d = new Date(`${v}:00Z`); d.setUTCHours(d.getUTCHours() + 3); return d.toISOString().slice(0, 16); };
+  await pc.getByTestId("pf-depart").fill(shift(await pc.getByTestId("pf-depart").inputValue()));
+  await pc.getByTestId("pf-arrive").fill(shift(await pc.getByTestId("pf-arrive").inputValue()));
+  await pc.getByTestId("pf-pnr").fill("AB12CD");
+  await pc.getByTestId("pf-fare").fill("3500");
+  await pc.getByTestId("pf-fee").fill("2500");
+  await pc.getByTestId("pf-submit").click();
+  const card = page.getByTestId("review-card").last();
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("Record your flight change");
+  await expect(card.getByTestId("offer-source")).toContainText("Entered by you from MakeMyTrip");
+  await expect(card.getByTestId("review-notice")).toContainText("books and charges nothing");
+  expect(await card.getByTestId("breakup-line").count()).toBe(2);
+  await expect(card.getByTestId("price-delta")).toContainText("6,000");
+  const newFlight = "AI143";
   await card.getByTestId("confirm-btn").click(); // "Yes, confirm"
   await expect(page.getByTestId("receipt-card")).toBeVisible();
+  await expect(page.getByTestId("receipt-card")).toContainText("you paid on the platform");
   await expect(page.getByTestId("guide-update")).toContainText("Offline guide updated to version");
 
   // 9. the guide now shows the new flight, and keeps working offline
@@ -134,10 +161,10 @@ test("2. asking for the pickup time cites the booking", async ({ page }) => {
   await expect(page.getByTestId("step-chip").first()).toContainText("get_itinerary");
 });
 
-test("3. move a flight → review card → Decline → booking unchanged", async ({ page }) => {
+test("3. extend the stay → review card → Decline → booking unchanged", async ({ page }) => {
   await loginAs(page, "traveller", `/trips/${REF}/chat`);
   const before = await booking(page);
-  const card = await askForCard(page, "Please move my Paris to Rome flight later");
+  const card = await askForCard(page, "Please extend my stay by 1 night");
   await expect(card.getByTestId("review-notice")).toHaveText("Nothing is booked until you tap Confirm.");
   await card.getByTestId("decline-btn").click();
   await expect(card).toHaveAttribute("data-state", "declined");
@@ -151,7 +178,7 @@ test("4. price move: 409 → new review card → Confirm → receipt → pack ve
   await loginAs(page, "traveller", `/trips/${REF}/chat`);
   const before = await booking(page);
   await page.getByLabel(/Demo: move the price/).check();
-  const first = await askForCard(page, "Please move my Paris to Rome flight later");
+  const first = await askForCard(page, "Please extend my stay by 1 night");
   const firstPrice = await first.getByTestId("price-delta").innerText();
   const firstQuote = await first.getAttribute("data-quote");
   await first.getByTestId("confirm-btn").click();
@@ -169,8 +196,13 @@ test("4. price move: 409 → new review card → Confirm → receipt → pack ve
 
 test("5. apply without a token, and with a reused token, are both rejected", async ({ page }) => {
   await loginAs(page, "traveller", "/trips");
-  const ev = await agentEvents(page, "Please move my Paris to Rome flight later");
-  const card = ev.find((e) => e.t === "review")!.card!;
+  // a quote to try the gate on: the agent shows the platform picker (no review card); the traveller then records the new flight
+  const ev = (await agentEvents(page, "Please move my flight later")) as unknown as { t: string; itemId?: string; flight?: { departIso: string; arriveIso: string } }[];
+  const pf = ev.find((e) => e.t === "platforms")!;
+  expect(pf.itemId).toBeTruthy();
+  const made = await page.request.post(`/api/trips/${REF}/external-change`, { data: { platform: "cleartrip", itemId: pf.itemId, flightNo: "6E 212", carrierName: "IndiGo", departLocal: pf.flight!.departIso, arriveLocal: pf.flight!.arriveIso, pnr: "XY98ZT", fareDiffInr: 1500, changeFeeInr: 500 } });
+  expect(made.status()).toBe(201);
+  const card = (await made.json()).card as { quoteId: string };
   const noToken = await page.request.post("/api/mock/v1/changes/apply", { data: { quoteId: card.quoteId } });
   expect(noToken.status()).toBe(401);
   expect((await noToken.json()).error).toBe("NO_TOKEN");

@@ -66,27 +66,28 @@ export async function ExploreView({ searchParams, home = false }: { searchParams
         </div>
       )}
 
-      <form action={home ? "/" : "/explore"} className="card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]" role="search">
-        <label className="space-y-1 text-[15px] text-muted">Destination<input name="q" defaultValue={sp.q} placeholder="Paris, Bali, Dubai…" className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink placeholder:text-muted" /></label>
+      <form action={home ? "/" : "/explore"} className="card grid grid-cols-2 gap-3 p-4 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]" role="search">
+        <label className="col-span-2 space-y-1 text-[15px] text-muted sm:col-span-1">Destination<input name="q" defaultValue={sp.q} placeholder="Paris, Bali, Dubai…" className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink placeholder:text-muted" /></label>
         <label className="space-y-1 text-[15px] text-muted">Month<select name="month" defaultValue={sp.month ?? ""} className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink"><option value="">Any month</option>{monthOptions().map((m) => <option key={m.v} value={m.v}>{m.label}</option>)}</select></label>
         <label className="space-y-1 text-[15px] text-muted">Budget per person<select name="budget" defaultValue={sp.budget ?? ""} className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink"><option value="">Any</option>{BUDGETS.map((b) => <option key={b} value={b}>Up to {inr(b)}</option>)}</select></label>
         <label className="space-y-1 text-[15px] text-muted">Flying from<select name="from" defaultValue={sp.from ?? ""} className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink"><option value="">Any city</option>{Object.entries(ORIGINS).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}</select></label>
         <label className="space-y-1 text-[15px] text-muted">Travellers<input name="pax" type="number" min={1} max={9} defaultValue={pax} className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink" /></label>
-        <button className="inline-flex min-h-12 items-center justify-center gap-2 self-end rounded-xl bg-lime px-5 font-semibold text-lime-ink glow"><Search size={18} /> Search</button>
+        <button className="col-span-2 inline-flex min-h-12 items-center justify-center gap-2 self-end rounded-xl sm:col-span-1 bg-lime px-5 font-semibold text-lime-ink glow"><Search size={18} /> Search</button>
       </form>
 
       <div className="space-y-2" aria-label="Filters">
-        <div className="flex flex-wrap gap-2">
-          <span className="self-center text-[15px] text-muted">Theme</span>
-          {THEMES.map((t) => <Link key={t} href={toggle("theme", t)} aria-pressed={sp.theme === t}><Chip active={sp.theme === t} className="capitalize">{t} <span className="opacity-70">{res.facets.theme[t] ?? 0}</span></Chip></Link>)}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <span className="self-center text-[15px] text-muted">Tier</span>
-          {TIERS.map((t) => <Link key={t} href={toggle("tier", t)} aria-pressed={sp.tier === t}><Chip active={sp.tier === t} className="capitalize">{t} <span className="opacity-70">{res.facets.tier[t] ?? 0}</span></Chip></Link>)}
-          <span className="ml-3 self-center text-[15px] text-muted">Nights</span>
-          {NIGHTS.map((n) => <Link key={n} href={toggle("nights", String(n))} aria-pressed={sp.nights === String(n)}><Chip active={sp.nights === String(n)}>{n} <span className="opacity-70">{res.facets.nights[n] ?? 0}</span></Chip></Link>)}
-          {Object.keys(sp).some((k) => k !== "pax" && sp[k]) && <Link href={home ? "/" : "/explore"} className="self-center text-[15px] text-accent underline">Clear all</Link>}
-        </div>
+        {/* phones: one scrollable row per filter group (no 4-line wall of chips); wider screens wrap */}
+        {[
+          { label: "Theme", key: "theme", opts: THEMES.map((v) => ({ v, n: res.facets.theme[v] ?? 0, cap: true })) },
+          { label: "Tier", key: "tier", opts: TIERS.map((v) => ({ v, n: res.facets.tier[v] ?? 0, cap: true })) },
+          { label: "Nights", key: "nights", opts: NIGHTS.map((n) => ({ v: String(n), n: res.facets.nights[n] ?? 0, cap: false })) },
+        ].map((g) => (
+          <div key={g.key} className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" role="group" aria-label={g.label}>
+            <span className="w-14 shrink-0 text-[15px] text-muted">{g.label}</span>
+            {g.opts.map((o) => <Link key={o.v} href={toggle(g.key, o.v)} aria-pressed={sp[g.key] === o.v} className="shrink-0"><Chip active={sp[g.key] === o.v} className={o.cap ? "capitalize" : ""}>{o.v} <span className="opacity-70">{o.n}</span></Chip></Link>)}
+          </div>
+        ))}
+        {Object.keys(sp).some((k) => k !== "pax" && sp[k]) && <Link href={home ? "/" : "/explore"} className="inline-flex min-h-11 items-center text-[15px] text-accent underline">Clear all filters</Link>}
       </div>
 
       {res.items.length === 0 ? (

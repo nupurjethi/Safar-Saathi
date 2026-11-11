@@ -78,9 +78,9 @@ function Inner({ pack }: { pack: import("@/lib/packs/types").OfflinePack }) {
         </Card>
       </div>
 
-      <Card className="grid grid-cols-2 gap-4" data-testid="local-time">
+      <Card className="grid grid-cols-2 items-start gap-4" data-testid="local-time">
         <div><h2 className="flex items-center gap-2 text-[15px] text-muted"><Clock size={18} strokeWidth={1.75} /> Local time in {stay.cityName}</h2><p className="text-[28px] font-semibold">{fmtTimeZ(now, stay.tz)}</p><p className="text-[15px] text-muted">India: {fmtTimeZ(now, "Asia/Kolkata")}</p></div>
-        <div><h2 className="flex items-center gap-2 text-[15px] text-muted"><Sun size={18} strokeWidth={1.75} /> Weather</h2>{weather ? <p className="text-[28px] font-semibold">{weather.tempC !== null ? `${Math.round(weather.tempC)}°C` : ""}<span className="ml-2 text-[17px] font-normal">{weather.summary}</span></p> : <p className="text-[15px] text-muted">{t.net === "online" ? "Loading…" : "Online only"}</p>}</div>
+        <div><h2 className="flex items-center gap-2 text-[15px] text-muted"><Sun size={18} strokeWidth={1.75} /> Weather</h2>{weather ? <div><p className="text-[28px] font-semibold">{weather.tempC !== null ? `${Math.round(weather.tempC)}°C` : "—"}</p><p className="text-[15px] leading-tight text-muted">{weather.summary}</p></div> : <p className="text-[15px] text-muted">{t.net === "online" ? "Loading…" : "Online only"}</p>}</div>
       </Card>
 
       <DayPlan pack={pack} today={now.toISOString().slice(0, 10)} />

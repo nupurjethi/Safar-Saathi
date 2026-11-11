@@ -50,7 +50,7 @@ export function Login() {
           <p className="text-[14px] text-muted">Demo accounts, sample data. Real staff sign-in needs staff accounts and an email key (not set up yet).</p>
         </Card>
         {err && <p role="alert" className="text-danger">{err}</p>}
-        <p className="text-[15px]"><Link href="/login?role=traveller" className="text-accent underline">I am a travel user</Link></p>
+        <p className="text-[15px]"><Link href="/login?role=traveller" className="inline-flex min-h-11 items-center text-accent underline">I am a travel user</Link></p>
       </div>
     );
   }
@@ -79,7 +79,7 @@ export function Login() {
         )}
       </Card>
       {err && <p role="alert" className="text-danger">{err}</p>}
-      <p className="text-[15px]"><Link href="/login?role=agent" className="text-accent underline">I am an agent</Link></p>
+      <p className="text-[15px]"><Link href="/login?role=agent" className="inline-flex min-h-11 items-center text-accent underline">I am an agent</Link></p>
     </div>
   );
 }

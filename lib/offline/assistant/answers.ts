@@ -352,7 +352,7 @@ function changeInfo(env: Env): OaAnswer {
   a.needsOnline = true;
   a.lines = [
     "I cannot book, change, extend or cancel anything. This assistant only reads your saved booking.",
-    "When you are back online, ask the Trip agent. It shows prices and options, and nothing changes until you tap Confirm.",
+    "To change a flight: when you are online, ask the Trip agent for \"Change my flight\". It opens MakeMyTrip, Goibibo, Cleartrip or ixigo (log in there yourself, we never see your password), then you record the new flight and tap Confirm. Hotel stays are changed through the agent too.",
     `Until then you can call your airline (${pack.contacts.airline}, ${pack.contacts.airline_phone}${isSampleNo(pack)}) or your hotel.`,
   ];
   if (hasNumber(pack.contacts.airline_phone)) a.links.push(tel("Call airline", pack.contacts.airline_phone));

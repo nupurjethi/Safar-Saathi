@@ -43,7 +43,7 @@ export function ReviewCardView({ card, state, error, onConfirm, onDecline }: { c
           {card.breakup.map((l) => <li key={l.label} className="flex justify-between gap-3" data-testid="breakup-line"><span className="text-muted">{l.label}</span><span className="font-medium">{inr(l.amountInr)}</span></li>)}
         </ul>
         <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2">
-          <span className="font-semibold">Total to pay</span>
+          <span className="font-semibold">{card.kind === "flight_external" ? "Total you paid on the platform" : "Total to pay"}</span>
           <span className="font-display text-[28px] font-bold" data-testid="price-delta">{inr(card.totalInr)}</span>
         </div>
         <p className="mt-1 text-[13px] text-muted" data-testid="offer-source">{card.source} · valid until {new Date(card.validUntil).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })} · {card.refundable ? "Refundable" : "Not refundable"}</p>

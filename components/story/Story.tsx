@@ -19,7 +19,7 @@ const CAPS = [
   { t: "Map, GPS and SOS", b: "A saved map and routes show a blue dot using only GPS. With signal but no data, SOS opens a prefilled text. Online, it pages a person on our team.", pills: ["Offline map", "GPS dot", "Off-route hint", "SMS SOS"] },
 ];
 const PILL_POS = [["left-[2%] top-[18%]", "right-[4%] top-[12%]", "left-[0%] bottom-[24%]", "right-[6%] bottom-[16%]"], ["left-[4%] top-[14%]", "right-[0%] top-[20%]", "left-[2%] bottom-[20%]", "right-[8%] bottom-[12%]"], ["left-[0%] top-[22%]", "right-[6%] top-[10%]", "left-[6%] bottom-[16%]", "right-[2%] bottom-[24%]"], ["left-[6%] top-[12%]", "right-[2%] top-[22%]", "left-[0%] bottom-[22%]", "right-[4%] bottom-[14%]"]];
-const STATS: [string, string, string][] = [["111", "Sample itineraries", "to browse and book today"], ["25", "Destinations", "across Europe, Asia and beyond"], ["6", "Offline help guides", "that need no mobile data"], ["60s", "Target to reach a person", "on a severity-1 SOS"]];
+const STATS: [string, string, string][] = [["113", "Sample itineraries", "to browse and book today"], ["26", "Destinations", "across Europe, Asia and beyond"], ["6", "Offline help guides", "that need no mobile data"], ["60s", "Target to reach a person", "on a severity-1 SOS"]];
 const WHY = [
   ["Confirm-first, not auto-book", "We didn't bolt AI onto a booking flow. The server cannot apply a change without your tap."],
   ["Offline from the first tap", "Your plan, map and help are saved on your phone before you fly."],
@@ -347,9 +347,9 @@ export function Story({ featured }: { featured: Featured[] }) {
       <section id="work" className="st-work relative h-[100svh] overflow-hidden max-md:min-h-[100svh]">
         <div className="st-work-bg absolute inset-0 bg-[#f4f4ee] opacity-0" />
         <div className="st-work-glow pointer-events-none absolute inset-x-[-10%] bottom-[-35%] h-[75%] origin-bottom rounded-[50%] bg-[radial-gradient(ellipse_at_50%_50%,rgba(216,253,52,0.9),rgba(216,253,52,0)_66%)] opacity-0 blur-2xl" />
-        <div className="st-work-left absolute left-[36px] top-1/2 w-[min(290px,34vw)] -translate-y-1/2 max-md:left-5 max-md:top-[22%] max-md:w-[60vw] max-md:translate-y-0">
+        <div className="st-work-left absolute left-[36px] top-1/2 w-[min(290px,34vw)] -translate-y-1/2 max-md:left-5 max-md:top-[22%] max-md:w-[80vw] max-md:translate-y-0">
           <h2 className="mb-5 text-[clamp(30px,3.2vw,46px)] tracking-[-0.03em]">Ready-made trips</h2>
-          <p className="mb-6 text-[15px] leading-snug text-white/75">From Paris cafés to Bali rice terraces: a sample of the 111 trips you can book today. Prices and inventory are sample data.</p>
+          <p className="mb-6 text-[15px] leading-snug text-white/75">From Paris cafés to Bali rice terraces: a sample of the 100+ trips you can book today. Prices and inventory are sample data.</p>
           <MonoLink href="/" className="text-[#d8fd34]">View all trips</MonoLink>
         </div>
         <div className="st-work-right absolute right-[36px] top-[54%] w-[min(300px,32vw)] max-md:right-5 max-md:top-auto max-md:bottom-[9%] max-md:w-[70vw]">
@@ -426,12 +426,12 @@ export function Story({ featured }: { featured: Featured[] }) {
           </div>
           <div className="w-full max-w-[420px] md:text-right" data-reveal>
             <Link href="/" data-cursor="link" className="st-mono block rounded-full bg-[#e6ff6b] px-6 py-5 text-center text-[15px] uppercase text-[#050505] transition-colors hover:bg-[#d8fd34]"><Scramble text="Start your trip ⟶" /></Link>
-            <p className="st-mono mt-4 text-[12px] uppercase text-white/55">Or <Link href="/api/auth/demo?next=/trips" prefetch={false} className="text-[#d8fd34] underline underline-offset-4">try the demo as Neha</Link></p>
+            <p className="st-mono mt-4 text-[12px] uppercase text-white/55">Or <Link href="/api/auth/demo?next=/trips" prefetch={false} className="inline-flex min-h-11 items-center text-[#d8fd34] underline underline-offset-4">try the demo as Neha</Link></p>
           </div>
         </div>
         <div className="st-container st-mono relative z-10 flex flex-wrap items-end justify-between gap-4 text-[12px] uppercase text-white/55">
           <p>© 2026 Safar Saathi · Prototype · Sample data · Test payments only</p>
-          <p className="flex gap-5"><Link href="/">Explore</Link><Link href="/trips">My trips</Link><Link href="/login">Sign in</Link><Link href="/admin/cases">Admin</Link></p>
+          <p className="flex gap-5 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center"><Link href="/">Explore</Link><Link href="/trips">My trips</Link><Link href="/login">Sign in</Link><Link href="/admin/cases">Admin</Link></p>
         </div>
       </section>
     </div>

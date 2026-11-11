@@ -244,6 +244,21 @@ export const payments = pgTable("payments", {
   updatedAt: updatedAt(),
 });
 
+/** Which booking platforms a traveller says they are logged in to (self-declared; we never see their account or password). */
+export const providerConnections = pgTable(
+  "provider_connections",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    provider: varchar("provider", { length: 16 }).notNull(), // makemytrip | goibibo | cleartrip | ixigo
+    status: varchar("status", { length: 12 }).notNull().default("connected"),
+    markedAt: ts("marked_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("provider_conn_user_uq").on(t.userId, t.provider)],
+);
+
 /* ----------------------------- Agent + safety ---------------------------- */
 
 export const agentThreads = pgTable("agent_threads", {

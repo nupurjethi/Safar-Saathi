@@ -49,29 +49,14 @@ export async function demoAgent(message: string, ctx: ToolCtx, e: Emit): Promise
     return `${st.hotel} can host you ${n} more night${n > 1 ? "s" : ""} (to ${st.newCheckOut}). Your return flight and airport drop-off move with it. Total ${opt.price} for all travellers, with the full breakup on the card. Tap Yes to confirm or No. Nothing is booked until you do.`;
   }
 
-  if (/\b(move|change|rebook|re-book|reschedule|later|earlier|shift)\b.*\b(flight|fly)\b|\b(flight|fly)\b.*\b(move|change|rebook|later|earlier)\b|\brebook\b/.test(m)) {
-    const want = /return|home|back to (pune|india)|last/.test(m) ? "return" : /outbound|first|to paris|going/.test(m) ? "outbound" : /paris.*rome|rome|intercity|next/.test(m) ? "intercity" : null;
+  if (/\b(move|change|rebook|re-book|reschedule|later|earlier|shift|cancel|refund)\b.*\b(flight|fly)\b|\b(flight|fly)\b.*\b(move|change|rebook|later|earlier|cancel|refund)\b|\brebook\b/.test(m)) {
+    const want = /return|home|back to (pune|india)|last/.test(m) ? "return" : /outbound|first|to paris|going/.test(m) ? "outbound" : /intercity|next/.test(m) ? "intercity" : null;
     const upcoming = flights.filter((f) => new Date(f.departsUtc).getTime() > Date.now());
     const target = flights.find((f) => f.leg === want) ?? upcoming.find((f) => f.leg === "intercity") ?? upcoming[0] ?? flights[0];
     if (!target) return "I do not see a flight on this booking.";
-    const s = await call("search_flights", { itemId: target.itemId }, ctx, e);
-    if (isErr(s)) return s.message;
-    const alts = s.alternatives as { flightId: string; flightNo: string; carrier: string; departsUtc: string; departsLocal: string; arrivesLocal: string }[];
-    if (!alts.length) return `I found no other seats on ${target.flightNo} for that day. I can pass this to our team.`;
-    const cur = new Date(s.currentFlight.departsUtc).getTime();
-    const wantEarlier = /earlier|sooner|before/.test(m);
-    const pool = alts.filter((a) => (wantEarlier ? new Date(a.departsUtc).getTime() < cur : new Date(a.departsUtc).getTime() > cur));
-    const near = (a: { departsUtc: string }) => Math.abs(new Date(a.departsUtc).getTime() - cur);
-    // the preferred direction first, then the nearest others, so the traveller sees up to 3 options
-    const picks = [...[...pool].sort((a, b) => near(a) - near(b)), ...alts.filter((a) => !pool.includes(a)).sort((a, b) => near(a) - near(b))].slice(0, 3);
-    const q = await call("quote_change", { kind: "flight_change", itemId: target.itemId, newFlightIds: picks.map((p) => p.flightId) }, ctx, e);
-    if (isErr(q)) return q.message;
-    const opts = q.options as { blocked: boolean; price: string }[];
-    if (opts.every((o) => o.blocked)) {
-      const c = await call("escalate_human", { summary: `Flight change options all above the price limit (${opts[0].price}).`, severity: 3 }, ctx, e);
-      return `These options cost more than our price limit, so a person on our team must handle it. Case ID ${c.caseRef ?? ""}.`;
-    }
-    return `I found ${picks.length} option${picks.length > 1 ? "s" : ""} to move ${target.flightNo}. Each card shows the full price breakup. Compare them, then tap Yes on one, or No. Nothing changes until you do.`;
+    const r = await call("connect_platform", { itemId: target.itemId }, ctx, e);
+    if (isErr(r)) return r.message;
+    return `To change ${target.flightNo} (${target.from} to ${target.to}), use the website or app where you bought the ticket. I cannot log in there for you, and I never see your password. Pick MakeMyTrip, Goibibo, Cleartrip or ixigo below, sign in on their site, and change the ticket there. Then come back and enter your new flight on the card. You review it and tap Yes, and only then I update your trip and offline guide.`;
   }
 
   if (/\b(route|directions?|how (do|can) i get|navigate|walk|way to)\b/.test(m)) {

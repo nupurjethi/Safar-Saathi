@@ -10,19 +10,21 @@ import { answerOffline, QUICK_QUESTIONS, type OaAnswer } from "@/lib/offline/ass
 import { inr } from "@/lib/time";
 import { OfflineAnswer } from "./OfflineAnswer";
 import { ReviewCardView, type Review, type ReviewState } from "./ReviewCard";
+import { PlatformCard, type PlatformsPart } from "./PlatformCard";
 
 type Step = { id: string; name: string; status: "running" | "done" | "error" };
-type Receipt = { receiptId: string; summary: string; priceDeltaInr: number; newTotalInr: number; packVersion: number; bookingRef: string; guide?: { updated: boolean; regenerated: string[]; origin?: string; message: string } };
+type Receipt = { kind?: string; receiptId: string; summary: string; priceDeltaInr: number; newTotalInr: number; packVersion: number; bookingRef: string; guide?: { updated: boolean; regenerated: string[]; origin?: string; message: string } };
 type Part =
   | { t: "review"; card: Review }
   | { t: "case"; caseRef: string; severity: number; slaSeconds: number; summary: string }
   | { t: "route"; routeId: string; fromName: string; toName: string; distance_m: number; duration_s: number; approximate: boolean; url: string }
   | { t: "receipt"; receipt: Receipt }
+  | PlatformsPart
   | { t: "oa"; answer: OaAnswer; question: string; userId: string; queued?: boolean };
 type Msg = { id: string; role: "user" | "assistant"; text: string; steps: Step[]; parts: Part[]; queued?: boolean; label?: string; ms?: number };
 
 const DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
-const PROMPTS = ["When is my pickup?", "Move my Paris to Rome flight later", "Extend my stay in Rome by 1 night", "How do I get from my hotel to the Colosseum?"];
+const PROMPTS = ["When is my pickup?", "Change my flight", "Extend my stay in Rome by 1 night", "How do I get from my hotel to the Colosseum?"];
 let uid = 0;
 const nid = () => `m${++uid}-${Date.now()}`;
 
@@ -100,7 +102,7 @@ export function Chat() {
           else if (e.t === "step") patch((m) => ({ ...m, steps: m.steps.some((s) => s.id === e.id) ? m.steps.map((s) => (s.id === e.id ? { ...s, status: e.status } : s)) : [...m.steps, { id: e.id, name: e.name, status: e.status }] }));
           else if (e.t === "text") patch((m) => ({ ...m, text: m.text + e.delta }));
           else if (e.t === "review") { setStates((s) => ({ ...s, [e.card.quoteId]: { s: "idle" } })); patch((m) => ({ ...m, parts: [...m.parts, e] })); }
-          else if (e.t === "case" || e.t === "route" || e.t === "receipt") patch((m) => ({ ...m, parts: [...m.parts, e] }));
+          else if (e.t === "case" || e.t === "route" || e.t === "receipt" || e.t === "platforms") patch((m) => ({ ...m, parts: [...m.parts, e] }));
           else if (e.t === "done") patch((m) => ({ ...m, label: e.label, ms: e.ms }));
           else if (e.t === "error") patch((m) => ({ ...m, text: m.text || e.message }));
         }
@@ -150,6 +152,11 @@ export function Chat() {
 
   const setState = (quoteId: string, s: ReviewState, err?: string) => setStates((cur) => ({ ...cur, [quoteId]: { s, err } }));
 
+  /** A review card made from the platform form: shown as a new assistant message, Yes / No as for every other change. */
+  const addReview = (card: Review) => {
+    setStates((s) => ({ ...s, [card.quoteId]: { s: "idle" } }));
+    setMsgs((m) => [...m, { id: nid(), role: "assistant", steps: [], text: "Check these details against your airline confirmation. If they match, tap Yes to update your trip.", parts: [{ t: "review", card }] }]);
+  };
   const confirm = async (card: Review) => {
     setState(card.quoteId, "confirming");
     try {
@@ -178,14 +185,14 @@ export function Chat() {
   const decline = async (card: Review) => {
     setState(card.quoteId, "declined");
     await fetch("/api/confirmations/decline", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quoteId: card.quoteId }) }).catch(() => {});
-    setMsgs((m) => [...m, { id: nid(), role: "assistant", steps: [], text: "No problem. Nothing was changed. Want a different time or date?", parts: [] }]);
+    setMsgs((m) => [...m, { id: nid(), role: "assistant", steps: [], text: "No problem. Nothing was changed.", parts: [] }]);
   };
 
   return (
     <div className="flex min-h-[calc(100dvh-13rem)] flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-[24px] font-semibold">Trip agent</h1>
-        <Link href={`/trips/${ref}/log`} className="text-[15px] text-accent underline">See action log</Link>
+        <Link href={`/trips/${ref}/log`} className="inline-flex min-h-11 items-center text-[15px] text-accent underline">See action log</Link>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -214,7 +221,7 @@ export function Chat() {
                 {m.parts.some((p) => p.t === "review") && m.parts.filter((p) => p.t === "review").length > 1 && <p className="text-[15px] font-semibold" data-testid="options-heading">Choose an option ({m.parts.filter((p) => p.t === "review").length}). Compare the breakups, then tap Yes on one or No.</p>}
                 {m.parts.map((p, i) => p.t === "oa" && pack
                   ? <OfflineAnswer key={i} answer={p.answer} pack={pack} now={trip.now} online={online} queued={p.queued} onAsk={(q) => void send(q)} onQueue={() => void queueForAgent(m.id, p)} />
-                  : <PartView key={i} p={p} states={states} onConfirm={confirm} onDecline={decline} refCode={ref} />)}
+                  : <PartView key={i} p={p} states={states} onConfirm={confirm} onDecline={decline} refCode={ref} online={online} onReview={addReview} />)}
                 {m.label && <p className="text-[13px] text-muted">{m.label}{m.ms ? ` · ${(m.ms / 1000).toFixed(1)} s` : ""}</p>}
               </div>
             )}
@@ -229,7 +236,7 @@ export function Chat() {
         <Button type="submit" variant="primary" disabled={busy || !input.trim()} aria-label="Send">{busy ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}</Button>
       </form>
       {DEMO && (
-        <label className="flex items-center gap-2 text-[14px] text-muted"><input type="checkbox" checked={chaos} onChange={(e) => setChaos(e.target.checked)} className="size-4 accent-[var(--lime)]" /> Demo: move the price by 5 to 15% before I confirm (shows re-quoting)</label>
+        <label className="flex min-h-11 items-center gap-3 text-[14px] text-muted"><input type="checkbox" checked={chaos} onChange={(e) => setChaos(e.target.checked)} className="size-6 shrink-0 accent-[var(--lime)]" /> Demo: move the price by 5 to 15% before I confirm (shows re-quoting)</label>
       )}
     </div>
   );
@@ -240,7 +247,7 @@ function StepChip({ s }: { s: Step }) {
   return <span data-testid="step-chip" className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 font-mono text-[13px]">{icon}{s.name}</span>;
 }
 
-function PartView({ p, states, onConfirm, onDecline, refCode }: { p: Part; states: Record<string, { s: ReviewState; err?: string }>; onConfirm: (c: Review) => void; onDecline: (c: Review) => void; refCode: string }) {
+function PartView({ p, states, onConfirm, onDecline, refCode, online, onReview }: { online: boolean; onReview: (c: Review) => void; p: Part; states: Record<string, { s: ReviewState; err?: string }>; onConfirm: (c: Review) => void; onDecline: (c: Review) => void; refCode: string }) {
   if (p.t === "review") {
     const st = states[p.card.quoteId] ?? { s: "idle" as ReviewState };
     return <ReviewCardView card={p.card} state={st.s} error={st.err} onConfirm={() => onConfirm(p.card)} onDecline={() => onDecline(p.card)} />;
@@ -252,11 +259,12 @@ function PartView({ p, states, onConfirm, onDecline, refCode }: { p: Part; state
         <div className="flex items-center justify-between"><h3 className="flex items-center gap-2 text-[20px] font-semibold"><CheckCircle2 className="text-ok" size={22} /> Receipt</h3><Badge tone={r.guide && !r.guide.updated ? "warn" : "ok"}>{r.guide && !r.guide.updated ? "Guide not updated" : `Offline guide updated · v${r.packVersion}`}</Badge></div>
         <p>{r.summary}</p>
         {r.guide && <p className="text-[15px]" data-testid="guide-update">{r.guide.message}{r.guide.regenerated.length ? ` Refreshed: ${r.guide.regenerated.join(", ")}.` : ""}</p>}
-        <dl className="grid grid-cols-2 gap-2 text-[15px]"><dt className="text-muted">Paid now (test payment)</dt><dd className="text-right font-semibold">{inr(r.priceDeltaInr)}</dd><dt className="text-muted">New trip total</dt><dd className="text-right font-semibold">{inr(r.newTotalInr)}</dd><dt className="text-muted">Receipt</dt><dd className="text-right font-mono">{r.receiptId}</dd></dl>
+        <dl className="grid grid-cols-2 gap-2 text-[15px]"><dt className="text-muted">{r.kind === "flight_external" ? "Recorded (you paid on the platform)" : "Paid now (test payment)"}</dt><dd className="text-right font-semibold">{inr(r.priceDeltaInr)}</dd><dt className="text-muted">New trip total</dt><dd className="text-right font-semibold">{inr(r.newTotalInr)}</dd><dt className="text-muted">Receipt</dt><dd className="text-right font-mono">{r.receiptId}</dd></dl>
         <Link href={`/trips/${refCode}/log`} className="text-accent underline">See action log</Link>
       </section>
     );
   }
+  if (p.t === "platforms") return <PlatformCard part={p} online={online} onReview={onReview} />;
   if (p.t === "oa") return null; // rendered by Chat itself (needs the saved pack)
   if (p.t === "case") {
     return (

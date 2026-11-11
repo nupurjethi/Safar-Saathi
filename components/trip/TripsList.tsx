@@ -44,8 +44,8 @@ export function TripsList() {
             {trips.map((t) => (
               <li key={t.ref}>
                 <Link href={`/trips/${t.ref}`} className="card block overflow-hidden transition hover:border-muted" data-testid="trip-card">
-                  {t.hero ? <PlacePhoto src={t.hero.src} alt={`${t.title}: ${t.hero.credit.title}`} credit={t.hero.credit} className="h-40" /> : <HeroArt palette={t.palette} className="h-24" />}
-                  <div className="space-y-1 p-4"><div className="flex items-center justify-between gap-2"><h2 className="text-[20px] font-semibold">{t.title}</h2>{t.status === "draft" ? <Badge tone="warn">Draft</Badge> : null}{t.saved ? <Badge tone="ok">Offline ready</Badge> : <Badge>Not saved</Badge>}</div><p className="text-[15px] text-muted">{fmtDate(t.startDate)} to {fmtDate(t.endDate, true)} · {t.pax} travellers · {inr(t.totalInr)}</p><p className="font-mono text-[14px] text-muted">{t.ref}</p></div>
+                  {t.hero ? <PlacePhoto src={t.hero.src} alt={`${t.title}: ${t.hero.credit.title}`} credit={t.hero.credit} className="h-40" linkCredit={false} /> : <HeroArt palette={t.palette} className="h-24" />}
+                  <div className="space-y-1 p-4"><h2 className="text-[20px] font-semibold leading-snug">{t.title}</h2><div className="flex flex-wrap gap-2">{t.status === "draft" ? <Badge tone="warn">Draft · not paid</Badge> : null}{t.saved ? <Badge tone="ok">Offline ready</Badge> : <Badge>Not saved</Badge>}</div><p className="text-[15px] text-muted">{fmtDate(t.startDate)} to {fmtDate(t.endDate, true)} · {t.pax} travellers · {inr(t.totalInr)}</p><p className="font-mono text-[14px] text-muted">{t.ref}</p></div>
                 </Link>
               </li>
             ))}

@@ -10,7 +10,7 @@ const VARIANTS: Record<Variant, string> = {
   danger: "bg-danger text-danger-ink hover:brightness-110",
   ghost: "text-ink hover:bg-surface-2",
 };
-const SIZES = { md: "min-h-11 px-6 text-[14px]", lg: "min-h-12 px-8 text-[15px]", xl: "min-h-16 px-8 text-xl" };
+const SIZES = { md: "min-h-11 px-4 text-[14px] sm:px-6", lg: "min-h-12 px-5 text-[15px] sm:px-8", xl: "min-h-16 px-6 text-xl sm:px-8" };
 
 type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: keyof typeof SIZES; block?: boolean };
 export function Button({ variant = "secondary", size = "lg", block, className, ...p }: BtnProps) {
@@ -36,7 +36,7 @@ export function Card({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
 
 export function Chip({ active, className, children, ...p }: { active?: boolean } & HTMLAttributes<HTMLSpanElement>) {
   return (
-    <span {...p} className={clsx("inline-flex min-h-9 items-center gap-1 rounded-full border px-4 text-[14px] font-medium", active ? "border-lime bg-lime text-lime-ink" : "border-line bg-surface text-ink", className)}>
+    <span {...p} className={clsx("inline-flex min-h-11 items-center gap-1 rounded-full border px-4 text-[14px] font-medium", active ? "border-lime bg-lime text-lime-ink" : "border-line bg-surface text-ink", className)}>
       {children}
     </span>
   );

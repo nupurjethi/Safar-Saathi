@@ -27,7 +27,7 @@ export function ItineraryCard({ it, href }: { it: CardItin; href: string }) {
       <div className="relative">
         {it.hero ? (
           <div className="relative h-44">
-            <PlacePhoto src={it.hero.src} alt={`${it.cityNames[0]}: ${it.hero.credit.title}`} credit={it.hero.credit} className="h-full" />
+            <PlacePhoto src={it.hero.src} alt={`${it.cityNames[0]}: ${it.hero.credit.title}`} credit={it.hero.credit} className="h-full" linkCredit={false} />
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
           </div>
         ) : <HeroArt palette={it.heroPalette} className="h-36" />}

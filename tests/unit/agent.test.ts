@@ -18,10 +18,12 @@ const emit = { step: () => {}, text: () => {} };
 beforeAll(async () => { c = await setupDb(); });
 
 describe("agent tools", () => {
-  it("registers 10 tools; the model gets 9 (refresh_offline_pack is server-only) and none can mint a token", () => {
-    expect(TOOL_NAMES).toEqual(["get_itinerary", "get_route", "search_flights", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"]);
+  it("registers 11 tools; the model gets 9 (refresh_offline_pack is server-only, search_flights is mock-only) and none can mint a token", () => {
+    expect(TOOL_NAMES).toEqual(["get_itinerary", "get_route", "search_flights", "connect_platform", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"]);
     expect(Object.keys(aiTools(mk())).sort()).toEqual([...MODEL_TOOLS].sort());
     expect(Object.keys(aiTools(mk()))).not.toContain("refresh_offline_pack");
+    expect(Object.keys(aiTools(mk()))).not.toContain("search_flights"); // flight changes never use sample inventory in chat
+    expect(Object.keys(aiTools(mk()))).toContain("connect_platform");
     expect(SMS_SAFE_TOOLS.every((t) => TOOL_NAMES.includes(t))).toBe(true);
     expect(Object.keys(aiTools(mk(), SMS_SAFE_TOOLS)).length).toBe(3);
   });
@@ -96,15 +98,23 @@ describe("demo agent (STUB used when no LLM key is set)", () => {
     expect(t).toMatch(/code SS\d{4}/);
   });
 
-  it("flight move: shows an option list (each with a breakup) through the gate, never says it is done", async () => {
+  it("flight change: sends the traveller to their own booking platform (picker), no sample flights, no review card, never says it is done", async () => {
     events.length = 0;
     const t = await demoAgent("Please move my Paris to Rome flight later", mk(), emit);
-    const cards = events.filter((e) => e.t === "review") as Extract<UiEvent, { t: "review" }>[];
-    expect(cards.length).toBeGreaterThanOrEqual(1);
-    expect(cards.length).toBeLessThanOrEqual(3);
-    for (const c of cards) expect(c.card.breakup.reduce((a, l) => a + l.amountInr, 0)).toBe(c.card.totalInr);
-    expect(t).toMatch(/tap Yes on one/);
-    expect(t).toMatch(/Nothing changes until you do/);
+    expect(events.some((e) => e.t === "review")).toBe(false);
+    const pf = events.find((e) => e.t === "platforms") as Extract<UiEvent, { t: "platforms" }>;
+    expect(pf).toBeTruthy();
+    expect(pf.platforms.map((p) => p.name)).toEqual(["MakeMyTrip", "Goibibo", "Cleartrip", "ixigo"]);
+    for (const p of pf.platforms) expect(p.searchUrl).toMatch(/^https:\/\//);
+    expect(t).toMatch(/cannot log in there for you/);
+    expect(t).toMatch(/never see your password/);
+    expect(t).not.toMatch(/done|confirmed|booked it/i);
+  });
+
+  it("the model cannot quote a flight change from sample data", async () => {
+    const tools = aiTools(mk()) as Record<string, { execute: (i: unknown) => Promise<{ error?: string }> }>;
+    const out = await tools.quote_change.execute({ kind: "flight_change", itemId: "00000000-0000-4000-8000-000000000000", newFlightId: "00000000-0000-4000-8000-000000000001" });
+    expect(out.error).toBe("USE_PLATFORM");
   });
 
   it("a lost passport escalates at once as severity 1", async () => {

@@ -9,16 +9,18 @@ export function creditLine(c: Credit) {
 }
 
 /** A real photo of a real landmark (Wikimedia Commons, openly licensed), with its credit kept on the image. */
-export function PlacePhoto({ src, alt, credit, className = "", showCredit = true, priority = false }: { src: string; alt: string; credit: Credit; className?: string; showCredit?: boolean; priority?: boolean }) {
+/** `linkCredit={false}` renders the credit as plain text: use it inside a card that is itself a link (nested <a> is invalid HTML and breaks hydration). */
+export function PlacePhoto({ src, alt, credit, className = "", showCredit = true, priority = false, linkCredit = true }: { src: string; alt: string; credit: Credit; className?: string; showCredit?: boolean; priority?: boolean; linkCredit?: boolean }) {
+  const pill = "absolute bottom-1 right-1 max-w-[92%] truncate rounded-full bg-black/65 px-2 py-0.5 text-[10px] leading-tight text-white/85";
   return (
     <div className={`relative overflow-hidden bg-surface-2 ${className}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} decoding="async" className="absolute inset-0 size-full object-cover" data-testid="place-photo" />
-      {showCredit && (
-        <a href={credit.sourceUrl} target="_blank" rel="noopener noreferrer" title={`${credit.title}: ${credit.author}, ${credit.license}. Wikimedia Commons`} className="absolute bottom-1 right-1 max-w-[92%] truncate rounded-full bg-black/65 px-2 py-0.5 text-[10px] leading-tight text-white/85 hover:text-white">
+      {showCredit && (linkCredit ? (
+        <a href={credit.sourceUrl} target="_blank" rel="noopener noreferrer" title={`${credit.title}: ${credit.author}, ${credit.license}. Wikimedia Commons`} className={`${pill} hover:text-white`}>
           {creditLine(credit)}
         </a>
-      )}
+      ) : <span title={`${credit.title}: ${credit.author}, ${credit.license}. Wikimedia Commons`} className={pill}>{creditLine(credit)}</span>)}
     </div>
   );
 }

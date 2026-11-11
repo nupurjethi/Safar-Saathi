@@ -16,6 +16,8 @@ import { getSmsAdapter } from "@/lib/sms/adapter";
 import { flightProviders, MOCK_SOURCE } from "@/lib/providers";
 import { searchWeb } from "@/lib/providers/web";
 import { refreshOfflinePack } from "@/lib/packs/refresh";
+import { connectedPlatforms } from "@/lib/server/connections";
+import { platformLinks } from "@/lib/providers/platforms";
 import { addDays, fmtDate, inr, localDate, localTime, tzLabel, zonedToUtc } from "@/lib/time";
 import { rateSeverity, SLA_SECONDS, type Severity } from "../severity";
 
@@ -23,7 +25,8 @@ export type UiEvent =
   | { t: "review"; card: ReviewCard }
   | { t: "case"; caseRef: string; severity: number; slaSeconds: number; summary: string }
   | { t: "route"; routeId: string; fromName: string; toName: string; distance_m: number; duration_s: number; approximate: boolean; url: string }
-  | { t: "receipt"; receipt: unknown };
+  | { t: "receipt"; receipt: unknown }
+  | { t: "platforms"; bookingRef: string; itemId: string; flight: { flightNo: string; carrier: string; from: string; to: string; date: string; departsLocal: string; arrivesLocal: string; departIso: string; arriveIso: string; pnr: string; leg: string; pax: number }; platforms: { id: string; name: string; searchUrl: string; manageUrl: string; connected: boolean }[] };
 
 export type ToolCtx = {
   userId: string;
@@ -38,10 +41,11 @@ export type ToolCtx = {
   ui: (e: UiEvent) => void;
 };
 
-export const TOOL_NAMES = ["get_itinerary", "get_route", "search_flights", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"] as const;
+export const TOOL_NAMES = ["get_itinerary", "get_route", "search_flights", "connect_platform", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 /** The model's allow-list. refresh_offline_pack is a server-side job that runs only after apply_change succeeds. */
-export const MODEL_TOOLS: ToolName[] = TOOL_NAMES.filter((t) => t !== "refresh_offline_pack");
+/** search_flights (mock inventory) is not offered to the model: flight changes go through the traveller's own booking platform (connect_platform). */
+export const MODEL_TOOLS: ToolName[] = TOOL_NAMES.filter((t) => t !== "refresh_offline_pack" && t !== "search_flights");
 
 /** Tools that SMS-channel runs may use (read-only plus escalation). */
 export const SMS_SAFE_TOOLS: ToolName[] = ["get_itinerary", "escalate_human", "send_sms"];
@@ -147,6 +151,36 @@ async function liveOffers(from: string, to: string, date: string, pax: number) {
   return out;
 }
 
+/**
+ * Flight changes happen on the platform where the ticket was bought. We cannot log in there for the traveller (these sites
+ * have no sign-in for other apps), so this shows a picker that opens each platform's own page, then a form to record the new
+ * flight, which goes through the confirmation gate. Nothing is searched, booked or changed here.
+ */
+export async function connectPlatformTool(ctx: ToolCtx, input: { itemId?: string }) {
+  const db = await getDb();
+  const flights = await db.select().from(s.bookingItems).where(and(eq(s.bookingItems.bookingId, ctx.bookingId), eq(s.bookingItems.kind, "flight"), eq(s.bookingItems.status, "confirmed")));
+  const sorted = flights.slice().sort((a, b) => String(a.details.departAt).localeCompare(String(b.details.departAt)));
+  const item = (input.itemId ? sorted.find((f) => f.id === input.itemId) : sorted.find((f) => new Date(String(f.details.departAt)).getTime() > ctx.now.getTime())) ?? sorted[0];
+  if (!item) throw new GateError("NOT_FOUND", 404, "There is no flight on this booking. Use get_itinerary to find itemId values.");
+  const pack = await loadPack(ctx);
+  const d = item.details as Record<string, string | number>;
+  const pf = pack.flights.find((x) => x.flight_no === d.flightNo && x.from === d.from);
+  const fromTz = pf?.from_tz ?? "UTC", toTz = pf?.to_tz ?? "UTC";
+  const date = localDate(new Date(String(d.departAt)), fromTz);
+  const connected = await connectedPlatforms(ctx.userId, db);
+  const flight = {
+    flightNo: String(d.flightNo), carrier: String(d.carrierName), from: String(d.from), to: String(d.to), date, leg: String(d.leg), pnr: String(d.pnr), pax: pack.booking.pax,
+    departIso: `${date}T${localTime(new Date(String(d.departAt)), fromTz)}`, arriveIso: `${localDate(new Date(String(d.arriveAt)), toTz)}T${localTime(new Date(String(d.arriveAt)), toTz)}`,
+    departsLocal: `${fmtDate(date)}, ${localTime(new Date(String(d.departAt)), fromTz)}`, arrivesLocal: `${fmtDate(localDate(new Date(String(d.arriveAt)), toTz))}, ${localTime(new Date(String(d.arriveAt)), toTz)}`,
+  };
+  const platforms = platformLinks({ from: flight.from, to: flight.to, date, pax: pack.booking.pax }).map((p) => ({ ...p, connected: connected.includes(p.id) }));
+  ctx.ui({ t: "platforms", bookingRef: ctx.bookingRef, itemId: item.id, flight, platforms });
+  return {
+    shown: true, flight, connectedPlatforms: connected,
+    next: "A platform picker is on the traveller's screen. Explain in plain words: they log in on MakeMyTrip, Goibibo, Cleartrip or ixigo themselves (we cannot log in for them and never see their password), change the ticket there, then come back and enter the new flight on the card. They review it and tap Confirm; only then does the trip and offline guide update. Do not offer sample flights or prices.",
+  };
+}
+
 export async function searchStaysTool(ctx: ToolCtx, input: { extraNights: number }) {
   const db = await getDb();
   const items = await db.select().from(s.bookingItems).where(and(eq(s.bookingItems.bookingId, ctx.bookingId), eq(s.bookingItems.kind, "hotel"), eq(s.bookingItems.status, "confirmed")));
@@ -225,6 +259,7 @@ export const SCHEMAS = {
   get_itinerary: z.object({}),
   get_route: z.object({ from: z.string().max(80).optional().describe("Place name, or 'hotel' / 'airport'. Defaults to the hotel."), to: z.string().max(80).describe("Place name, or 'hotel' / 'airport'.") }),
   search_flights: z.object({ itemId: Id.describe("Booked flight itemId from get_itinerary"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }),
+  connect_platform: z.object({ itemId: Id.optional().describe("Booked flight itemId from get_itinerary. Defaults to the next upcoming flight.") }),
   search_stays: z.object({ extraNights: z.number().int().min(1).max(3) }),
   search_web: z.object({ query: z.string().min(3).max(200).describe("A travel information question, e.g. visa rules or opening hours") }),
   quote_change: z.object({ kind: z.enum(["flight_change", "hotel_extend"]), itemId: Id.optional().describe("flight_change: booked flight itemId"), newFlightId: Id.optional().describe("flight_change: one flightId from search_flights"), newFlightIds: z.array(Id).min(1).max(3).optional().describe("flight_change: up to 3 flightIds to show as an option list"), extraNights: z.number().int().min(1).max(3).optional().describe("hotel_extend: nights to add") }),
@@ -238,9 +273,10 @@ export const DESCRIPTIONS: Record<ToolName, string> = {
   get_itinerary: "Read the traveller's trip: next plans, pickup, hotel, local time, flights (with itemId). Call this first for any trip question.",
   get_route: "Get a saved map route and steps between two places on the trip (e.g. hotel to Colosseum).",
   search_flights: "Find alternative flights for a booked flight on the same route and day.",
+  connect_platform: "Use for ANY request to change, move, reschedule, rebook, cancel or get a refund for a FLIGHT. Shows a picker to open MakeMyTrip, Goibibo, Cleartrip or ixigo (the traveller logs in there themselves) and a form to record the new flight. Does not search, price or change anything.",
   search_stays: "Check availability to extend the stay at the last hotel by 1 to 3 nights.",
   search_web: "Look up general travel information with a web search API. Cites sources. Never a booking price.",
-  quote_change: "Price a change and show the traveller an option list with a price breakup and Yes / No. For a flight pass up to 3 newFlightIds. Does NOT change anything.",
+  quote_change: "Price a HOTEL EXTENSION (kind hotel_extend) and show the traveller a review card with a price breakup and Yes / No. Never use it for flights (use connect_platform). Does NOT change anything.",
   apply_change: "Apply a quoted change. Needs the traveller's Confirm tap; without it this does nothing. Never claim a change is done unless this returns applied: true.",
   refresh_offline_pack: "Server-side job (not callable by the model): regenerates the affected offline guide rules after a confirmed change.",
   escalate_human: "Open a case for a human agent. Use for safety, medical, lost passport, stranded, missed connection, no-show, anything over the price limit, or missing data.",
@@ -248,14 +284,18 @@ export const DESCRIPTIONS: Record<ToolName, string> = {
 };
 
 /** Run any tool by name with validated input. Shared by the LLM path and the demo agent. */
-export async function runTool(name: ToolName, rawInput: unknown, ctx: ToolCtx, opts: { internal?: boolean } = {}) {
+export async function runTool(name: ToolName, rawInput: unknown, ctx: ToolCtx, opts: { internal?: boolean; fromModel?: boolean } = {}) {
   if (name === "refresh_offline_pack" && !opts.internal) throw new GateError("FORBIDDEN", 403, "refresh_offline_pack is a server-side job. It runs only after apply_change succeeds.");
   const input = SCHEMAS[name].parse(rawInput ?? {}) as never;
+  if (opts.fromModel && name === "quote_change" && (input as { kind: string }).kind === "flight_change") {
+    return { error: "USE_PLATFORM", message: "Flight changes are not quoted from sample data. Call connect_platform so the traveller changes the ticket on their own booking platform." };
+  }
   return logged(ctx, name, input, async () => {
     switch (name) {
       case "get_itinerary": return getItinerary(ctx);
       case "get_route": return getRoute(ctx, input);
       case "search_flights": return searchFlightsTool(ctx, input);
+      case "connect_platform": return connectPlatformTool(ctx, input);
       case "search_stays": return searchStaysTool(ctx, input);
       case "search_web": return searchWeb((input as { query: string }).query);
       case "refresh_offline_pack": return refreshOfflinePack(ctx.bookingId, "Manual refresh");
@@ -271,7 +311,7 @@ export async function runTool(name: ToolName, rawInput: unknown, ctx: ToolCtx, o
 export function aiTools(ctx: ToolCtx, allow: readonly ToolName[] = MODEL_TOOLS) {
   const out: Record<string, any> = {};
   for (const name of allow) {
-    out[name] = tool({ description: DESCRIPTIONS[name], inputSchema: SCHEMAS[name] as never, execute: async (input: unknown) => runTool(name, input, ctx) } as never);
+    out[name] = tool({ description: DESCRIPTIONS[name], inputSchema: SCHEMAS[name] as never, execute: async (input: unknown) => runTool(name, input, ctx, { fromModel: true }) } as never);
   }
   return out;
 }

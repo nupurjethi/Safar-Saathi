@@ -99,8 +99,7 @@ export function TripMap({ pack, routeId, pin, onRoute, focusCity }: { pack: Offl
     try {
       if (pts.length > 1) {
         const lons = pts.map((p) => p[0]), lats = pts.map((p) => p[1]);
-        const h = map.getContainer().clientHeight || 400;
-        map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: { top: 70, bottom: Math.min(230, Math.round(h * 0.4)), left: 40, right: 40 }, duration: 600, maxZoom: 18 });
+        map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: { top: 60, bottom: 50, left: 40, right: 40 }, duration: 600, maxZoom: 18 });
       } else if (pts.length === 1) map.easeTo({ center: pts[0] as [number, number], zoom: 16 });
     } catch { /* a camera error must never take the page down */ }
   }, [ready, route, routeId, pin, pack.routes, pack.places]);
@@ -189,44 +188,57 @@ export function TripMap({ pack, routeId, pin, onRoute, focusCity }: { pack: Offl
     return { step: next.s, distToNext: Math.max(0, next.p - here.progressM), remaining, onLineM: nearestOnLine(pos, line).distM };
   }, [route, pos]);
 
+  // the map sits above the control panel in a column, so the panel never covers it; resize the canvas when the panel grows or shrinks
+  useEffect(() => {
+    if (!el.current || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => mapRef.current?.resize());
+    ro.observe(el.current);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className="relative h-[calc(100dvh-8.5rem)] min-h-[420px] overflow-hidden rounded-2xl border-[1.5px] border-line sm:h-[calc(100dvh-12rem)]">
-      {/* inline position: maplibre-gl.css sets .maplibregl-map { position: relative }, which would otherwise win and collapse this to 0 height */}
-      <div ref={el} className="absolute inset-0" style={{ position: "absolute", inset: 0 }} data-testid="map-canvas" aria-label="Offline map" role="application" />
-      {!hasTiles && <p className="absolute left-3 top-3 z-10 max-w-[70%] rounded-xl bg-surface/90 px-3 py-2 text-[13px] text-muted">Street map files are not built yet (run npm run tiles:build). Places and routes still draw offline.</p>}
-      {outside && <p role="status" data-testid="outside-map" className="absolute inset-x-3 top-3 z-10 rounded-xl border border-line bg-surface/95 px-3 py-2 text-[13px] text-muted">You are outside the area saved for this trip. Your GPS dot still works, but there is no street map here.</p>}
+    <div className="flex h-[calc(100dvh-16rem)] min-h-[440px] flex-col overflow-hidden rounded-2xl border-[1.5px] border-line sm:h-[calc(100dvh-12rem)]">
+      <div className="relative min-h-[220px] flex-1">
+        {/* inline position: maplibre-gl.css sets .maplibregl-map { position: relative }, which would otherwise win and collapse this to 0 height */}
+        <div ref={el} className="absolute inset-0" style={{ position: "absolute", inset: 0 }} data-testid="map-canvas" aria-label="Offline map" role="application" />
+        {!hasTiles && <p className="absolute left-3 top-3 z-10 max-w-[70%] rounded-xl bg-surface/90 px-3 py-2 text-[13px] text-muted">Street map files are not built yet (run npm run tiles:build). Places and routes still draw offline.</p>}
+        {outside && <p role="status" data-testid="outside-map" className="absolute inset-x-3 top-3 z-10 rounded-xl border border-line bg-surface/95 px-3 py-2 text-[13px] text-muted">You are outside the area saved for this trip. Your GPS dot still works, but there is no street map here.</p>}
 
-      {off?.off && (
-        <div role="alert" data-testid="off-route" className="absolute inset-x-3 top-3 z-20 flex items-center gap-3 rounded-2xl border-[1.5px] border-warn bg-surface p-3">
-          <TriangleAlert className="shrink-0 text-warn" />
-          <div className="min-w-0"><p className="font-semibold">You are off the saved route</p><p className="text-[15px] text-muted">Head {cardinal(off.bearingDeg ?? 0)} for {fmtDist(off.distM)} to get back on it.</p></div>
-          <span aria-hidden style={{ transform: `rotate(${off.bearingDeg ?? 0}deg)` }} className="ml-auto text-3xl text-warn">↑</span>
-        </div>
-      )}
+        {off?.off && (
+          <div role="alert" data-testid="off-route" className="absolute inset-x-3 top-3 z-20 flex items-center gap-3 rounded-2xl border-[1.5px] border-warn bg-surface p-3">
+            <TriangleAlert className="shrink-0 text-warn" />
+            <div className="min-w-0"><p className="font-semibold">You are off the saved route</p><p className="text-[15px] text-muted">Head {cardinal(off.bearingDeg ?? 0)} for {fmtDist(off.distM)} to get back on it.</p></div>
+            <span aria-hidden style={{ transform: `rotate(${off.bearingDeg ?? 0}deg)` }} className="ml-auto text-3xl text-warn">↑</span>
+          </div>
+        )}
+      </div>
 
-      <div className="absolute inset-x-0 bottom-0 z-20 space-y-2 border-t border-line bg-bg/95 p-3 backdrop-blur">
+      <div className="max-h-[48%] shrink-0 space-y-2 overflow-y-auto border-t border-line bg-bg p-3">
         {route ? (
           <>
-            <div className="flex items-center justify-between gap-2"><p className="min-w-0 truncate font-semibold">{route.fromName} to {route.toName}</p><Badge>{fmtDist(route.distance_m)} · {Math.round(route.duration_s / 60)} min</Badge></div>
+            <div className="flex items-center justify-between gap-2"><p className="min-w-0 flex-1 truncate font-semibold">{route.fromName} to {route.toName}</p><Badge className="shrink-0 whitespace-nowrap">{fmtDist(route.distance_m)} · {Math.round(route.duration_s / 60)} min</Badge></div>
             {route.approximate && <p className="text-[13px] text-muted">Sample straight-line route (no routing key at build time). Not turn-by-turn.</p>}
             {nav ? (
               <p data-testid="next-step" className="rounded-xl border-[1.5px] border-line bg-surface p-2 text-[15px]"><span className="font-semibold">In {fmtDist(nav.distToNext)}:</span> {nav.step.instruction}</p>
-            ) : <p className="text-[15px] text-muted">{route.steps[0]?.instruction}</p>}
+            ) : <p className="line-clamp-2 text-[15px] text-muted">{route.steps[0]?.instruction}</p>}
           </>
-        ) : <p className="text-[15px] text-muted">Pick a saved route below, or tap the target to see where you are.</p>}
+        ) : <p className="text-[15px] text-muted">Pick a saved route above, or tap Show my location to see where you are.</p>}
         {gpsErr && <p className="text-[14px] text-warn">{gpsErr}</p>}
         {pos && <p className="text-[13px] text-muted" data-testid="gps-status">GPS fix: accuracy about {Math.round(pos.accuracy ?? 0)} m</p>}
-        <div className="flex flex-wrap gap-2">
-          <Button size="md" variant={tracking ? "secondary" : "primary"} onClick={() => (!tracking ? startGps() : stopGps())} data-testid="locate-btn"><Crosshair size={18} /> {!tracking ? "Show my location" : "Stop location"}</Button>
-          {route && <Button size="md" variant={navigating ? "danger" : "secondary"} onClick={() => (navigating ? stopNav() : void startNav())}><Navigation size={18} /> {navigating ? "Stop navigating" : "Start navigating"}</Button>}
-          {route && process.env.NEXT_PUBLIC_DEMO_MODE !== "false" && (<>
-            <Button size="md" variant="ghost" onClick={() => simulate(false)}><Footprints size={18} /> Demo: walk route</Button>
-            <Button size="md" variant="ghost" onClick={() => simulate(true)}>Demo: go off-route</Button>
-          </>)}
-          {route && <Button size="md" variant="ghost" onClick={() => onRoute(null)}>Clear</Button>}
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <Button size="md" variant={tracking ? "secondary" : "primary"} onClick={() => (!tracking ? startGps() : stopGps())} data-testid="locate-btn" className={route ? "px-2" : "col-span-2"}><Crosshair size={18} className="shrink-0" /> {!tracking ? <><span className="sm:hidden">My location</span><span className="hidden sm:inline">Show my location</span></> : "Stop location"}</Button>
+          {route && <Button size="md" variant={navigating ? "danger" : "secondary"} onClick={() => (navigating ? stopNav() : void startNav())} className="px-2"><Navigation size={18} className="shrink-0" /> {navigating ? "Stop" : "Navigate"}</Button>}
         </div>
+        {route && (
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+            {process.env.NEXT_PUBLIC_DEMO_MODE !== "false" && (<>
+              <Button size="md" variant="ghost" className="whitespace-nowrap border border-line px-1" onClick={() => simulate(false)}><Footprints size={16} className="hidden shrink-0 sm:block" /> <span className="sm:hidden">Walk demo</span><span className="hidden sm:inline">Demo: walk route</span></Button>
+              <Button size="md" variant="ghost" className="whitespace-nowrap border border-line px-1" onClick={() => simulate(true)}><span className="sm:hidden">Off-route</span><span className="hidden sm:inline">Demo: go off-route</span></Button>
+            </>)}
+            <Button size="md" variant="ghost" className="px-1" onClick={() => onRoute(null)}>Clear</Button>
+          </div>
+        )}
       </div>
-      <span className="pointer-events-none absolute bottom-[5.2rem] right-1 z-10 hidden text-[12px] text-muted">© OpenStreetMap contributors</span>
     </div>
   );
 }

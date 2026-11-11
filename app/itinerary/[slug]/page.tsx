@@ -74,14 +74,14 @@ export default async function ItineraryPage({ params, searchParams }: { params: 
           {visited.length > 0 && (
             <section aria-labelledby="places">
               <SectionTitle>Real places on this trip</SectionTitle>
-              <ul id="places" className="grid gap-3 sm:grid-cols-2" data-testid="places">
+              <ul id="places" className="grid grid-cols-2 gap-3" data-testid="places">
                 {visited.map((p) => (
                   <li key={p.id} className="card overflow-hidden">
-                    {p.image ? <PlacePhoto src={p.image.src} alt={p.name} credit={p.image.credit} className="h-40" /> : <div className="grid h-24 place-items-center bg-surface-2 text-[13px] text-muted">No openly licensed photo found</div>}
-                    <div className="space-y-0.5 p-3">
-                      <p className="font-semibold leading-snug">{p.name}</p>
+                    {p.image ? <PlacePhoto src={p.image.src} alt={p.name} credit={p.image.credit} className="h-28 sm:h-40" /> : <div className="grid h-28 place-items-center bg-surface-2 px-2 text-center text-[13px] text-muted sm:h-24">No openly licensed photo found</div>}
+                    <div className="space-y-0.5 p-2.5 sm:p-3">
+                      <p className="text-[15px] font-semibold leading-snug sm:text-[17px]">{p.name}</p>
                       {p.nameLocal && p.nameLocal !== p.name && <p className="text-[15px] text-muted" lang="und">{p.nameLocal}</p>}
-                      <a href={`https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=17/${p.lat}/${p.lon}`} target="_blank" rel="noopener noreferrer" className="inline-block pt-1 font-mono text-[13px] text-accent underline">{p.lat.toFixed(4)}, {p.lon.toFixed(4)} · open on OpenStreetMap</a>
+                      <a href={`https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=17/${p.lat}/${p.lon}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-mono text-[13px] text-accent underline"><span className="sm:hidden">Open on map</span><span className="hidden sm:inline">{p.lat.toFixed(4)}, {p.lon.toFixed(4)} · open on OpenStreetMap</span></a>
                     </div>
                   </li>
                 ))}
@@ -116,7 +116,7 @@ export default async function ItineraryPage({ params, searchParams }: { params: 
         </aside>
       </div>
 
-      <div className="no-print fixed inset-x-0 bottom-14 z-30 border-t border-line bg-bg/95 p-3 backdrop-blur sm:bottom-0">
+      <div className="no-print fixed inset-x-0 bottom-[5.25rem] z-30 border-t border-line bg-bg/95 p-3 backdrop-blur sm:bottom-0">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div><p className="text-[13px] text-muted">{pax} travellers · from</p><p className="font-display text-[24px] font-bold">{pr ? inr(pr.totalInr) : inr(it.pricePerPersonInr)}</p></div>
           <SelectTrip slug={slug} startDate={pr?.startDate ?? ""} pax={pax} />

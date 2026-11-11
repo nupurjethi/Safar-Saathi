@@ -73,20 +73,20 @@ export function Checkout() {
         {step === "travellers" ? (
           <>
             {travs.map((t, i) => (
-              <Card key={i} className="grid gap-3 sm:grid-cols-[1fr_130px_110px]">
-                <label className="text-[15px] text-muted">Name as on passport<input value={t.name} onChange={(e) => setTravs((a) => a.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink" autoComplete="off" data-testid={`trav-name-${i}`} /></label>
+              <Card key={i} className="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_130px_110px]">
+                <label className="col-span-2 text-[15px] text-muted sm:col-span-1">Name as on passport<input value={t.name} onChange={(e) => setTravs((a) => a.map((x, k) => (k === i ? { ...x, name: e.target.value } : x)))} className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink" autoComplete="off" data-testid={`trav-name-${i}`} /></label>
                 <label className="text-[15px] text-muted">Age<select value={t.ageBand} onChange={(e) => setTravs((a) => a.map((x, k) => (k === i ? { ...x, ageBand: e.target.value as Trav["ageBand"] } : x)))} className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-2 text-[17px] text-ink"><option value="child">Child</option><option value="teen">Teen</option><option value="adult">Adult</option><option value="senior">Senior</option></select></label>
                 <label className="text-[15px] text-muted">Passport last 4<input inputMode="numeric" maxLength={4} value={t.passportLast4} onChange={(e) => setTravs((a) => a.map((x, k) => (k === i ? { ...x, passportLast4: e.target.value.replace(/\D/g, "") } : x)))} placeholder="Optional" className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink" /></label>
               </Card>
             ))}
             <p className="text-[14px] text-muted">This trip is for {b.pax} traveller{b.pax > 1 ? "s" : ""}. We keep only the last 4 digits of a passport number. Never enter a full passport number or card details here.</p>
-            <Button variant="primary" disabled={!valid} onClick={() => setStep("pay")} data-testid="to-pay">Continue</Button>
+            <Button variant="primary" block disabled={!valid} onClick={() => setStep("pay")} data-testid="to-pay" className="sm:w-auto">Continue</Button>
           </>
         ) : (
           <>
             <Card className="space-y-2"><h2 className="text-[20px] font-semibold">Test payment</h2><p className="rounded-xl border border-warn p-3 text-[15px]">This is a test payment. <strong>No money moves.</strong> Do not enter any real card details. There is nothing to enter.</p><p className="text-muted">Pay with: Dummy payment</p></Card>
             {err && <p role="alert" className="text-danger">{err}</p>}
-            <div className="flex gap-2"><Button onClick={() => setStep("travellers")}>Back</Button><Button variant="primary" size="lg" onClick={pay} disabled={busy} data-testid="pay-btn">{busy ? "Booking…" : `Test pay ${inr(b.totalInr)}`}</Button></div>
+            <div className="flex gap-2"><Button onClick={() => setStep("travellers")}>Back</Button><Button variant="primary" size="lg" className="flex-1 sm:flex-none" onClick={pay} disabled={busy} data-testid="pay-btn">{busy ? "Booking…" : `Test pay ${inr(b.totalInr)}`}</Button></div>
           </>
         )}
       </div>
@@ -94,7 +94,7 @@ export function Checkout() {
         <h2 className="text-[20px] font-semibold">{b.title}</h2>
         <p className="text-[15px] text-muted">{fmtDate(b.startDate)} to {fmtDate(b.endDate)} · {b.pax} travellers</p>
         <dl className="space-y-1.5">{lines.map(([l, a]) => <div key={l} className="flex justify-between"><dt className="text-muted">{l}</dt><dd>{inr(a)}</dd></div>)}<div className="flex justify-between border-t border-line pt-2 text-[20px] font-bold"><dt>Total</dt><dd className="font-display">{inr(b.totalInr)}</dd></div></dl>
-        <p className="text-[13px] text-muted">Sample data. <Link href={`/trips/${ref}`} className="text-accent underline">Back to trip</Link></p>
+        <p className="text-[13px] text-muted">Sample data. <Link href={`/trips/${ref}`} className="inline-flex min-h-11 items-center text-accent underline">Back to trip</Link></p>
       </Card></aside>
     </div>
   );

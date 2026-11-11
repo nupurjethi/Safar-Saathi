@@ -1,6 +1,5 @@
 "use client";
 import { LifeBuoy, MessageSquare, Phone, TriangleAlert } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { TripGate } from "./TripGate";
 import { useTrip } from "./TripProvider";
@@ -105,7 +104,7 @@ function Inner({ pack }: { pack: OfflinePack }) {
         </div>
       ) : status === "signal" || hasSignal ? (
         <div className="space-y-2">
-          <a data-testid="sos-main" href={`sms:${gateway}?body=${encodeURIComponent(body)}`} className="inline-flex min-h-16 w-full items-center justify-center gap-2 rounded-xl bg-danger px-6 text-xl font-semibold text-danger-ink"><MessageSquare size={24} /> Send SOS text</a>
+          <a data-testid="sos-main" href={`sms:${gateway}?body=${encodeURIComponent(body)}`} className="inline-flex min-h-16 w-full items-center justify-center gap-2 rounded-full bg-danger px-5 text-xl font-bold text-danger-ink"><MessageSquare size={24} /> Send SOS text</a>
           <p className="rounded-xl border border-line p-3 text-[15px]">Your text app opens with this message. <strong>You tap Send yourself.</strong> A web app cannot send an SMS silently.</p>
           <p className="font-mono text-[15px] text-muted">{body}</p>
           <p className="text-[14px] text-muted">SMS uses cellular signal, not mobile data.</p>
@@ -120,7 +119,7 @@ function Inner({ pack }: { pack: OfflinePack }) {
       {err && <p role="alert" className="text-danger">{err}</p>}
 
       <Card className="space-y-3">
-        <div className="flex items-center justify-between"><h2 className="text-[20px] font-semibold">Call now · {stay.cityName}</h2>{!stay.emergency.verified && <Badge tone="warn">Sample, confirm locally</Badge>}</div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-[20px] font-semibold">Call now · {stay.cityName}</h2>{!stay.emergency.verified && <Badge tone="warn">Sample, confirm locally</Badge>}</div>
         <div className="grid gap-2 sm:grid-cols-3">
           {([["Emergency", stay.emergency.general], ["Police", stay.emergency.police], ["Ambulance", stay.emergency.ambulance]] as const).map(([l, n]) => (
             canCall
@@ -131,7 +130,11 @@ function Inner({ pack }: { pack: OfflinePack }) {
         <p className="text-[15px] text-muted">{stay.consulate.name}. <span className="font-mono">{stay.consulate.phone}</span> (sample)</p>
       </Card>
 
-      <p className="text-[14px] text-muted">Help that needs no data: <Link className="text-accent underline" href={`/trips/${pack.booking.ref}/guide?s=lost-passport`}>Lost passport</Link> · <Link className="text-accent underline" href={`/trips/${pack.booking.ref}/guide?s=medical-help`}>Medical help</Link>. {pack.disclaimer}</p>
+      <div className="space-y-2">
+        <p className="text-[15px] text-muted">Help that needs no data:</p>
+        <div className="grid grid-cols-2 gap-2"><LinkButton href={`/trips/${pack.booking.ref}/guide?s=lost-passport`} size="md">Lost passport</LinkButton><LinkButton href={`/trips/${pack.booking.ref}/guide?s=medical-help`} size="md">Medical help</LinkButton></div>
+        <p className="text-[14px] text-muted">{pack.disclaimer}</p>
+      </div>
     </div>
   );
 }

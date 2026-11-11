@@ -52,11 +52,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh flex-col">
       <header className="no-print sticky top-0 z-40 px-3 pt-3 pt-safe sm:px-4 sm:pt-4">
         <div className="mx-auto flex max-w-6xl items-center gap-3 rounded-full border border-line bg-bg/70 py-2 pl-5 pr-2 backdrop-blur-xl">
-          <Link href="/" className="font-display text-[20px] font-bold tracking-tight">
+          <Link href="/" className="inline-flex min-h-11 items-center font-display text-[20px] font-bold tracking-tight">
             safar<span className="text-accent">saathi</span>
           </Link>
           <span className="hidden items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-[12px] font-medium uppercase tracking-wide text-muted lg:inline-flex" title="All trips, prices, flights and hotels are sample data from our own mock travel API."><span aria-hidden className="size-1.5 rounded-full bg-lime" />Sample data · test payment</span>
-          <nav aria-label="Primary" className="ml-4 hidden items-center gap-6 text-[14px] font-medium sm:flex">
+          <nav aria-label="Primary" className="ml-4 hidden items-center gap-6 text-[14px] font-medium sm:flex [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center">
             <Link href="/" className={path === "/" || path.startsWith("/explore") || path.startsWith("/itinerary") ? "text-accent" : "text-ink hover:text-accent"}>Trips</Link>
             <Link href="/trips" className={path.startsWith("/trips") ? "text-accent" : "text-ink hover:text-accent"}>My trips</Link>
             {staff && <Link href="/agent" className={path.startsWith("/agent") ? "text-accent" : "text-ink hover:text-accent"}>Agent desk</Link>}
@@ -73,8 +73,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
         </div>
-        <div className="mt-2 text-center text-[12px] font-medium uppercase tracking-wide text-muted sm:hidden">Sample data · test payment, no money moves</div>
       </header>
+      <div className="no-print px-4 pt-2 text-center text-[12px] font-medium uppercase tracking-wide text-muted sm:hidden">Sample data · test payment, no money moves</div>
 
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 sm:pb-12">{children}</main>
 
