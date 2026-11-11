@@ -18,12 +18,13 @@ const emit = { step: () => {}, text: () => {} };
 beforeAll(async () => { c = await setupDb(); });
 
 describe("agent tools", () => {
-  it("registers 11 tools; the model gets 9 (refresh_offline_pack is server-only, search_flights is mock-only) and none can mint a token", () => {
-    expect(TOOL_NAMES).toEqual(["get_itinerary", "get_route", "search_flights", "connect_platform", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"]);
+  it("registers 12 tools; the model gets 10 (refresh_offline_pack is server-only, search_flights is mock-only) and none can mint a token", () => {
+    expect(TOOL_NAMES).toEqual(["get_itinerary", "get_route", "search_flights", "connect_platform", "compare_flights", "search_stays", "search_web", "quote_change", "apply_change", "refresh_offline_pack", "escalate_human", "send_sms"]);
     expect(Object.keys(aiTools(mk())).sort()).toEqual([...MODEL_TOOLS].sort());
     expect(Object.keys(aiTools(mk()))).not.toContain("refresh_offline_pack");
     expect(Object.keys(aiTools(mk()))).not.toContain("search_flights"); // flight changes never use sample inventory in chat
     expect(Object.keys(aiTools(mk()))).toContain("connect_platform");
+    expect(Object.keys(aiTools(mk()))).toContain("compare_flights");
     expect(SMS_SAFE_TOOLS.every((t) => TOOL_NAMES.includes(t))).toBe(true);
     expect(Object.keys(aiTools(mk(), SMS_SAFE_TOOLS)).length).toBe(3);
   });
@@ -107,6 +108,7 @@ describe("demo agent (STUB used when no LLM key is set)", () => {
     expect(pf.platforms.map((p) => p.name)).toEqual(["MakeMyTrip", "Goibibo", "Cleartrip", "ixigo"]);
     for (const p of pf.platforms) expect(p.searchUrl).toMatch(/^https:\/\//);
     expect(t).toMatch(/cannot log in there for you/);
+    expect(t).toMatch(/do not have a live price feed/); // no price API configured: it says so instead of inventing prices
     expect(t).toMatch(/never see your password/);
     expect(t).not.toMatch(/done|confirmed|booked it/i);
   });

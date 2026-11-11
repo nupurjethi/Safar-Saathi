@@ -3,7 +3,7 @@ export type Breakup = { label: string; amountInr: number };
 /** One offer shape for every provider. Prices from a real provider must say so and carry a validity time. */
 export type Offer = {
   id: string;
-  provider: "mock" | "duffel" | "manual";
+  provider: "mock" | "duffel" | "amadeus" | "manual";
   kind: "flight" | "stay";
   /** "Sample data (mock API)" or "Live price from <provider>". */
   source: string;
@@ -13,7 +13,11 @@ export type Offer = {
   refundable: boolean;
   summary: string;
   payload: unknown;
+  /** Structured trip facts when the provider supplies them (times are local to each airport, minute precision). */
+  facts?: FlightFacts;
 };
+
+export type FlightFacts = { carrier: string; flightNo: string; from: string; to: string; departLocal: string; arriveLocal: string; stops: number; durationMin?: number };
 
 export type FlightQuery = { from: string; to: string; date: string; pax: number; anchor?: "depart" | "arrive" };
 export type StayQuery = { hotelId: string; checkin: string; nights: number; rooms: number };

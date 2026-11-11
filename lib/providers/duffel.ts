@@ -1,4 +1,4 @@
-import type { FlightProvider, FlightQuery, Offer } from "./types";
+import type { FlightFacts, FlightProvider, FlightQuery, Offer } from "./types";
 
 /**
  * Optional real provider through an OFFICIAL API (Duffel), enabled only when DUFFEL_API_KEY is set and the
@@ -19,15 +19,23 @@ export const DuffelFlightProvider: FlightProvider = {
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) throw new Error(`Duffel ${res.status}`);
-    const j = (await res.json()) as { data?: { offers?: { id: string; total_amount: string; base_amount: string; tax_amount: string; total_currency: string; expires_at: string; owner?: { name?: string }; slices?: { segments?: { marketing_carrier_flight_number?: string }[] }[] }[] } };
+    const j = (await res.json()) as { data?: { offers?: { id: string; total_amount: string; base_amount: string; tax_amount: string; total_currency: string; expires_at: string; owner?: { name?: string }; slices?: { duration?: string; segments?: { marketing_carrier_flight_number?: string; marketing_carrier?: { iata_code?: string }; origin?: { iata_code?: string }; destination?: { iata_code?: string }; departing_at?: string; arriving_at?: string }[] }[] }[] } };
     const fx = Number(process.env.FX_TO_INR ?? 1);
     return (j.data?.offers ?? []).slice(0, 5).map((o): Offer => {
       const cur = o.total_currency;
       const conv = (x: string) => Math.round(Number(x) * (cur === "INR" ? 1 : fx));
       const breakup = [{ label: `Base fare (${cur} ${o.base_amount})`, amountInr: conv(o.base_amount) }, { label: `Taxes and fees (${cur} ${o.tax_amount})`, amountInr: conv(o.tax_amount) }];
-      return { id: o.id, provider: "duffel", kind: "flight", source: `Live price from Duffel, valid until ${o.expires_at}`, validUntil: o.expires_at, breakup, totalInr: breakup.reduce((a, l) => a + l.amountInr, 0), refundable: false, summary: `${o.owner?.name ?? "Airline"} ${o.slices?.[0]?.segments?.[0]?.marketing_carrier_flight_number ?? ""}`.trim(), payload: o };
+      return { id: o.id, provider: "duffel", kind: "flight", source: `Live price from Duffel, valid until ${o.expires_at}`, validUntil: o.expires_at, breakup, totalInr: breakup.reduce((a, l) => a + l.amountInr, 0), refundable: false, summary: `${o.owner?.name ?? "Airline"} ${o.slices?.[0]?.segments?.[0]?.marketing_carrier_flight_number ?? ""}`.trim(), payload: o, facts: duffelFacts(o) };
     });
   },
   async quote() { throw new Error("STUB: live quotes are not wired"); },
   async book() { throw new Error("STUB: booking through a live provider is not enabled in this prototype"); },
 };
+
+function duffelFacts(o: { owner?: { name?: string }; slices?: { duration?: string; segments?: { marketing_carrier_flight_number?: string; marketing_carrier?: { iata_code?: string }; origin?: { iata_code?: string }; destination?: { iata_code?: string }; departing_at?: string; arriving_at?: string }[] }[] }): FlightFacts | undefined {
+  const segs = o.slices?.[0]?.segments;
+  if (!segs?.length) return undefined;
+  const first = segs[0], last = segs[segs.length - 1];
+  if (!first.departing_at || !last.arriving_at) return undefined;
+  return { carrier: o.owner?.name ?? first.marketing_carrier?.iata_code ?? "Airline", flightNo: `${first.marketing_carrier?.iata_code ?? ""}${first.marketing_carrier_flight_number ?? ""}`, from: first.origin?.iata_code ?? "", to: last.destination?.iata_code ?? "", departLocal: first.departing_at.slice(0, 16), arriveLocal: last.arriving_at.slice(0, 16), stops: segs.length - 1 };
+}

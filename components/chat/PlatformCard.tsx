@@ -8,6 +8,8 @@ export type PlatformsPart = {
   t: "platforms"; bookingRef: string; itemId: string;
   flight: { flightNo: string; carrier: string; from: string; to: string; date: string; departsLocal: string; arrivesLocal: string; departIso: string; arriveIso: string; pnr: string; leg: string; pax: number };
   platforms: { id: string; name: string; searchUrl: string; manageUrl: string; connected: boolean }[];
+  /** Filled in when the traveller picked a flight from the price comparison. */
+  prefill?: { flightNo: string; carrierName: string; departIso: string; arriveIso: string };
 };
 
 const field = "mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[16px] text-ink";
@@ -19,7 +21,7 @@ const field = "mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-sur
 export function PlatformCard({ part, online, onReview }: { part: PlatformsPart; online: boolean; onReview: (card: Review) => void }) {
   const [connected, setConnected] = useState<Record<string, boolean>>(() => Object.fromEntries(part.platforms.map((p) => [p.id, p.connected])));
   const [platform, setPlatform] = useState(part.platforms.find((p) => p.connected)?.id ?? part.platforms[0].id);
-  const [f, setF] = useState({ flightNo: "", carrierName: "", departLocal: part.flight.departIso, arriveLocal: part.flight.arriveIso, pnr: "", fareDiffInr: "0", changeFeeInr: "0" });
+  const [f, setF] = useState({ flightNo: part.prefill?.flightNo ?? "", carrierName: part.prefill?.carrierName ?? "", departLocal: part.prefill?.departIso ?? part.flight.departIso, arriveLocal: part.prefill?.arriveIso ?? part.flight.arriveIso, pnr: "", fareDiffInr: "0", changeFeeInr: "0" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [sent, setSent] = useState(false);

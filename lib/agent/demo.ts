@@ -54,9 +54,13 @@ export async function demoAgent(message: string, ctx: ToolCtx, e: Emit): Promise
     const upcoming = flights.filter((f) => new Date(f.departsUtc).getTime() > Date.now());
     const target = flights.find((f) => f.leg === want) ?? upcoming.find((f) => f.leg === "intercity") ?? upcoming[0] ?? flights[0];
     if (!target) return "I do not see a flight on this booking.";
-    const r = await call("connect_platform", { itemId: target.itemId }, ctx, e);
+    const r = await call("compare_flights", { itemId: target.itemId }, ctx, e);
     if (isErr(r)) return r.message;
-    return `To change ${target.flightNo} (${target.from} to ${target.to}), use the website or app where you bought the ticket. I cannot log in there for you, and I never see your password. Pick MakeMyTrip, Goibibo, Cleartrip or ixigo below, sign in on their site, and change the ticket there. Then come back and enter your new flight on the card. You review it and tap Yes, and only then I update your trip and offline guide.`;
+    if (!r.configured) {
+      return `To change ${target.flightNo} (${target.from} to ${target.to}) you book the new flight on a travel platform. I cannot log in there for you (I never see your password), and I do not have a live price feed connected, so I cannot compare prices for you. Pick MakeMyTrip, Goibibo, Cleartrip or ixigo below (pre-filled for this route), sign in on their site, compare what they show and pay there. Then come back and enter your new flight on the card. You review it and tap Yes, and only then I update your trip and offline guide.`;
+    }
+    if (!(r.offers as unknown[]).length) return "The price sources returned no flights for that route and day. Try another date, or open a platform below.";
+    return `I compared live fares from ${(r.providers as { name: string }[]).map((p) => p.name).join(" and ")}. Cheapest: ${r.cheapest}. The table below shows every option. Those are reference fares; the platforms can show a different price, so open your platform from the card (pre-filled), log in there, check the same flight and pay there. I cannot log in or take payment. After you pay, record the booking on the card and tap Yes.`;
   }
 
   if (/\b(route|directions?|how (do|can) i get|navigate|walk|way to)\b/.test(m)) {
