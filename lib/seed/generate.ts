@@ -115,7 +115,7 @@ export function generateSeed(opts: SeedOptions): SeedData {
     const hs: { id: string; stars: number; nightly: number; name: string; lat: number; lon: number }[] = [];
     ([3, 4, 5] as const).forEach((stars, i) => {
       const hid = r.uuid();
-      const anchor = d.pois[i % d.pois.length];
+      const anchor = d.hotelAnchors?.[i] ?? d.pois[i % d.pois.length];
       const lat = anchor.lat + (r.next() - 0.5) * 0.006;
       const lon = anchor.lon + (r.next() - 0.5) * 0.006;
       const num = r.int(3, 98);

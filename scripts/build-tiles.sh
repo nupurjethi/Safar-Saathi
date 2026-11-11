@@ -35,10 +35,10 @@ extract() { # name bbox maxzoom
 
 # slug<TAB>overview bbox<TAB>core bbox from the seed source of truth
 LIST="$(npx --yes tsx scripts/list-bboxes.ts "$@")"
-echo "$LIST" | while IFS=$'\t' read -r slug obbox cbbox; do
+echo "$LIST" | while IFS=$'\t' read -r slug obbox cbbox ovz; do
   [ -z "$slug" ] && continue
   echo "→ $slug"
-  extract "$slug" "$obbox" "$OVERVIEW_ZOOM"
+  extract "$slug" "$obbox" "${ovz:-$OVERVIEW_ZOOM}"
   extract "$slug-core" "$cbbox" "$CORE_ZOOM"
 done
 

@@ -27,6 +27,8 @@ export type DestSeed = {
   /** Base nightly INR for a 4-star room. */
   cost: number;
   pois: PoiSeed[];
+  /** Optional fixed spots (lat, lon) for the 3/4/5-star hotels instead of landmark-anchored ones. */
+  hotelAnchors?: { lat: number; lon: number }[];
 };
 
 const p = (name: string, local: string, lat: number, lon: number): PoiSeed => ({ name, local, lat, lon });
@@ -255,7 +257,11 @@ export const DESTINATIONS: DestSeed[] = [
       p("Lalbagh Botanical Garden", "ಲಾಲ್‌ಬಾಗ್ ಸಸ್ಯೋದ್ಯಾನ", 12.9507, 77.5848), p("Cubbon Park", "ಕಬ್ಬನ್ ಉದ್ಯಾನ", 12.9763, 77.5929), p("Vidhana Soudha", "ವಿಧಾನ ಸೌಧ", 12.9797, 77.5907),
       p("Bangalore Palace", "ಬೆಂಗಳೂರು ಅರಮನೆ", 12.9988, 77.5921), p("ISKCON Temple Bangalore", "ಇಸ್ಕಾನ್ ದೇವಾಲಯ", 13.0098, 77.5511), p("Commercial Street", "ಕಮರ್ಷಿಯಲ್ ಸ್ಟ್ರೀಟ್", 12.9823, 77.6081),
       p("Dodda Basavana Gudi (Bull Temple)", "ದೊಡ್ಡ ಬಸವನ ಗುಡಿ", 12.9419, 77.5679), p("Tipu Sultan's Summer Palace", "ಟಿಪ್ಪು ಸುಲ್ತಾನ್ ಬೇಸಿಗೆ ಅರಮನೆ", 12.9593, 77.5738), p("UB City", "ಯು.ಬಿ. ಸಿಟಿ", 12.9718, 77.5961),
+      // Bannerghatta side (south Bengaluru): the demo traveller stays here
+      p("Bannerghatta Biological Park", "ಬನ್ನೇರುಘಟ್ಟ ಜೈವಿಕ ಉದ್ಯಾನವನ", 12.8006, 77.5766), p("Meenakshi Mall, Bannerghatta Road", "ಮೀನಾಕ್ಷಿ ಮಾಲ್", 12.8913, 77.5968),
     ],
+    // fictional sample hotels placed on Bannerghatta Road (Arekere / Meenakshi Mall / Gottigere); the 4-star one is the standard demo trip's stay
+    hotelAnchors: [{ lat: 12.8878, lon: 77.6012 }, { lat: 12.8925, lon: 77.5979 }, { lat: 12.8575, lon: 77.5934 }],
   },
 ];
 

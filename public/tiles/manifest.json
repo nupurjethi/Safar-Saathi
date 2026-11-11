@@ -32,12 +32,12 @@
     "hash": "sha256:c2be69a8388a444b0352efbcff8e4ca6c510f2ba2782bae5ba28863bee287af9"
   },
   "bangalore-core": {
-    "bytes": 8848594,
-    "hash": "sha256:04e254b6b6261fc5c357c8e5fa0daea04ef79a29de75a0b721dbdb43cc334887"
+    "bytes": 28025116,
+    "hash": "sha256:f4e54ad9c912dd8275cdad39cbebf4049a67ad81b78a02b6a3c1bd53dd765f25"
   },
   "bangalore": {
-    "bytes": 2837376,
-    "hash": "sha256:ed8be7cff49a190a39dc7579f8e124e6561a79abb5fdb44fcdd3cba54a0044eb"
+    "bytes": 15537105,
+    "hash": "sha256:f27b7a2c8e49f29af5ad2613cf3cc998aeae0b10fd95a94acafeae67d70b18de"
   },
   "bangkok-core": {
     "bytes": 8487716,

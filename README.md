@@ -90,7 +90,7 @@ Flight changes no longer use sample inventory. Ask the agent to move, reschedule
 
 ### Bangalore demo trip (GPS)
 
-Two domestic itineraries (`bangalore-3n-standard-culture` from Delhi, `bangalore-3n-budget-family` from Mumbai) and a ready demo booking `SS-56001` that starts today, so the trip is "happening now". Open it from the first page ("Demo: Bangalore trip (GPS)"), go to **Map**, tap **Show my location**: the blue dot appears on the real Bengaluru street map (works with no data). If you are outside the saved area the map says so. The tiles cover Cubbon Park, Vidhana Soudha, Lalbagh, Bangalore Palace and the airport road (BLR). 26 cities, 906 saved real routes.
+Two domestic itineraries (`bangalore-3n-standard-culture` from Delhi, `bangalore-3n-budget-family` from Mumbai) and a ready demo booking `SS-56001` that starts today, so the trip is "happening now". Open it from the first page ("Demo: Bangalore trip (GPS)"), go to **Map**, tap **Show my location**: the blue dot appears on the real Bengaluru street map (works with no data). If you are outside the saved area the map says so. The map covers **all of Bengaluru** (about 42 MB for this trip): street level to zoom 15 from Bannerghatta in the south (Bannerghatta Road, Arekere, Meenakshi Mall, the Biological Park) through Jayanagar, the centre and Indiranagar to Hebbal in the north, plus zoom 14 for the whole city out to Whitefield and the airport. The demo hotels are fictional and sit on Bannerghatta Road, so the blue GPS dot lands next to them. 26 cities, 954 saved real routes.
 
 ### Travel user sign-in: demo, email + password, email code
 

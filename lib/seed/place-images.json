@@ -1417,5 +1417,16 @@
   "pageUrl": "https://commons.wikimedia.org/wiki/File:UBtowers.jpg",
   "width": 900,
   "height": 675
+ },
+ "bangalore/Bannerghatta Biological Park": {
+  "file": "/places/bangalore/bannerghatta-biological-park.jpg",
+  "title": "Bannerghatta National Park",
+  "author": "Venkat S dhavala",
+  "license": "CC BY-SA 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lurking_tiger.jpg",
+  "pageUrl": "https://commons.wikimedia.org/wiki/File:Lurking_tiger.jpg",
+  "width": 900,
+  "height": 592
  }
 }

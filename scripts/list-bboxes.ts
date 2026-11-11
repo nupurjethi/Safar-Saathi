@@ -16,6 +16,10 @@ for (const d of destinations) {
   const pad = 0.015, cap = 0.07; // cap: half-size in degrees around the centre of the points
   const cx = (Math.min(...lons) + Math.max(...lons)) / 2, cy = (Math.min(...lats) + Math.max(...lats)) / 2;
   const hx = Math.min((Math.max(...lons) - Math.min(...lons)) / 2 + pad, cap), hy = Math.min((Math.max(...lats) - Math.min(...lats)) / 2 + pad, cap);
-  const core = [cx - hx, cy - hy, cx + hx, cy + hy].map(r4);
-  console.log(`${d.slug}\t${d.bbox.join(",")}\t${core.join(",")}`);
+  let core = [cx - hx, cy - hy, cx + hx, cy + hy].map(r4);
+  let overview: number[] = d.bbox;
+  let ovZoom = "";
+  // The Bangalore demo covers the whole city (Bannerghatta in the south to the airport in the north): wider boxes, overview to zoom 14
+  if (d.slug === "bangalore") { core = [77.47, 12.78, 77.72, 13.06]; overview = [77.4, 12.74, 77.82, 13.23]; ovZoom = "14"; }
+  console.log(`${d.slug}\t${overview.join(",")}\t${core.join(",")}\t${ovZoom}`);
 }
