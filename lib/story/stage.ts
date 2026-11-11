@@ -2,6 +2,14 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { buildAirplane, PLANE_L, type Airplane } from "./airplane";
 import { clamp01, heroPose, kf, smooth } from "./path";
+import { cardLife, cardOpacity, cubicBezier, fillBannerGrid, fillCardGrid, unroll, type BannerOpts } from "./cloth";
+
+/* cloth sizes / grids */
+const BANNER_L = 34, BANNER_H = 11, BNU = 40, BNV = 14; // banner: plane-local units, grid segments
+const CARD_NU = 24, CARD_NV = 16;
+const CARD_LIFE = 1.9; // scroll units one card lives (cards are one unit apart): slide+unroll, hold flat, leave
+const ROOF_X = 3; // plane-local x of the cabin roof where cards start wrapped (the constant-section part of the fuselage)
+const FUS_R = 2.05; // fuselage radius (airplane.ts)
 
 export type CardData = { title: string; sub: string; price: string; palette: [string, string]; cities: string[]; image?: { src: string; credit: string } };
 
@@ -13,9 +21,15 @@ export type StageState = {
   work: number;
   cta: number;
   pointer: { x: number; y: number };
+  /** Smoothed scroll speed in px per frame (more cloth flutter while scrolling fast). */
+  scrollVel: number;
 };
 
-export const initialState = (): StageState => ({ active: "hero", hero: 0, services: 0, serviceIndex: 0, work: 0, cta: 0, pointer: { x: 0, y: 0 } });
+const IDENTITY = new THREE.Quaternion();
+/** Card frame -> plane frame on the roof: card x along the fuselage (nose), card y across the roof away from the viewer, card z up. */
+const ROOF_FRAME = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 1, 0)));
+
+export const initialState = (): StageState => ({ active: "hero", hero: 0, services: 0, serviceIndex: 0, work: 0, cta: 0, pointer: { x: 0, y: 0 }, scrollVel: 0 });
 
 /* keyframe interpolator + flight paths live in ./path (pure, unit-tested) */
 
@@ -154,7 +168,16 @@ export class Stage {
   plane: Airplane;
   rig = new THREE.Group();
   banner!: THREE.Mesh;
-  bannerBase!: Float32Array;
+  private bannerPos!: Float32Array;
+  private bannerShade!: Float32Array;
+  private windVel = 0; // smoothed |scroll velocity| 0..1
+  private lagY = 0;
+  private lagZ = 0;
+  private prevPos = new THREE.Vector3();
+  private cardW = 3;
+  private cardH = 1.875;
+  private front = new THREE.Vector3(-0.6, -0.35, 4.2);
+  private cardBuf = new Float32Array((CARD_NU + 1) * (CARD_NV + 1) * 3);
   ring!: THREE.Mesh;
   ringShapeKey = "";
   cards: { mesh: THREE.Mesh; tex: THREE.Texture }[] = [];
@@ -198,17 +221,16 @@ export class Stage {
     this.plane.group.rotation.order = "YZX";
     this.rig.add(this.plane.group);
 
-    // banner trailing the tail (the "cloth": wrinkled at first, ironed flat as you scroll)
+    // banner trailing the tail: a pennant pinned at the tail edge. Every frame it is re-shaped as cloth (lib/story/cloth.ts)
     const bt = makeBannerTexture(bannerLabels); this.disposables.push(bt);
-    const bg = new THREE.PlaneGeometry(34, 12.4, 110, 40);
+    const bg = new THREE.PlaneGeometry(BANNER_L, BANNER_H, BNU, BNV);
     this.disposables.push(bg);
-    this.bannerBase = new Float32Array(bg.attributes.position.array as Float32Array);
-    this.banner = new THREE.Mesh(bg, new THREE.MeshStandardMaterial({ map: bt, emissiveMap: bt, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.7, metalness: 0.1, side: THREE.DoubleSide, transparent: true, opacity: 1 }));
+    const bn = bg.attributes.position.count;
+    bg.setAttribute("color", new THREE.BufferAttribute(new Float32Array(bn * 3).fill(1), 3)); // brightness per vertex: darker in the folds
+    this.bannerPos = new Float32Array(bn * 3); this.bannerShade = new Float32Array(bn);
+    this.banner = new THREE.Mesh(bg, new THREE.MeshStandardMaterial({ map: bt, emissiveMap: bt, emissive: 0xffffff, emissiveIntensity: 0.3, vertexColors: true, roughness: 0.62, metalness: 0.05, side: THREE.DoubleSide, transparent: true, opacity: 1 }));
     this.banner.position.set(-PLANE_L / 2 - 1.2, 1.9, 0);
-    this.banner.rotation.y = Math.PI / 2; // spans the Z axis behind the tail; we shear it in update()
-    this.banner.rotation.y = 0;
-    (this.banner.geometry as THREE.PlaneGeometry).translate(-17, 0, 0); // pivot at the tail edge, trailing toward -X
-    this.bannerBase = new Float32Array(this.banner.geometry.attributes.position.array as Float32Array);
+    this.banner.frustumCulled = false; // vertices are rewritten every frame
     this.plane.group.add(this.banner);
 
     // engine steam / vapour
@@ -257,12 +279,13 @@ export class Stage {
     this.rig.add(this.ring);
     this.disposables.push(rm);
 
-    // sliding trip cards (the "fabric" coming off the board, now boarding passes from the cabin door)
+    // trip cards: cloth that starts wrapped over the cabin roof, slides off along a curve while unrolling, then lies flat and still in front
     cards.forEach((d) => {
       const tex = makeCardTexture(d);
-      const geo = new THREE.PlaneGeometry(3.7, 2.31, 28, 14);
-      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.55, roughness: 0.55, metalness: 0.05, side: THREE.DoubleSide, transparent: true }));
-      m.visible = false; m.userData.base = new Float32Array(geo.attributes.position.array as Float32Array);
+      const geo = new THREE.PlaneGeometry(3, 1.875, CARD_NU, CARD_NV);
+      geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3));
+      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.42, vertexColors: true, roughness: 0.6, metalness: 0.04, side: THREE.DoubleSide, transparent: true }));
+      m.visible = false; m.frustumCulled = false; m.renderOrder = this.cards.length + 1;
       this.rig.add(m); this.cards.push({ mesh: m, tex }); this.disposables.push(tex, geo);
     });
   }
@@ -276,6 +299,10 @@ export class Stage {
     const aspect = w / h;
     // keep ~8.5 world units visible across, so the whole plane fits on a phone
     this.camera.position.set(0, 0.35, Math.max(13, 8.5 / (2 * Math.tan((15 * Math.PI) / 180) * aspect)));
+    // where a finished card lies: in front of the plane, clear of the text columns; sized to the visible width at that depth
+    this.front.set(aspect > 1.1 ? 0.3 : 0, aspect > 1.1 ? -0.35 : -0.2, 4.2);
+    const visW = 2 * Math.tan((15 * Math.PI) / 180) * (this.camera.position.z - this.front.z) * aspect;
+    this.cardW = aspect > 1.1 ? Math.min(2.7, visW * 0.4) : visW * 0.66; this.cardH = this.cardW / 1.6;
     this.camera.lookAt(0, 0, 0);
     this.camera.updateProjectionMatrix();
   }
@@ -300,8 +327,19 @@ export class Stage {
     const px = this.smoothPointer.x, py = this.smoothPointer.y;
 
     const P = this.plane.group;
+    // wind inputs: how fast you are scrolling, and how the plane itself is moving (the cloth lags behind it)
+    s.scrollVel *= Math.pow(0.03, Math.max(0, dt)); // lenis only reports while moving: let the value die away when you stop
+    this.windVel += (clamp01(Math.abs(s.scrollVel) / 45) - this.windVel) * Math.min(1, dt * 6);
+    if (dt > 0) {
+      const inv = P.quaternion.clone().invert();
+      const vloc = P.position.clone().sub(this.prevPos).divideScalar(Math.max(dt, 1 / 120)).applyQuaternion(inv);
+      const k = Math.min(1, dt * 4);
+      this.lagY += (Math.max(-4, Math.min(4, -vloc.y * 1.2)) - this.lagY) * k;
+      this.lagZ += (Math.max(-4, Math.min(4, -vloc.z * 1.2)) - this.lagZ) * k;
+    }
+    this.prevPos.copy(P.position);
     let visible = false;
-    let gear = 0, bannerCalm = 1, bannerVis = 0;
+    let gear = 0, bannerVis = 0;
     this.ring.visible = false;
     this.cards.forEach((c) => (c.mesh.visible = false));
     this.green.intensity = 55;
@@ -314,7 +352,6 @@ export class Stage {
       P.rotation.set(hp.rx + py * 0.04, hp.ry + px * 0.1, hp.rz + py * 0.03);
       P.scale.setScalar(0.165 * hp.scale);
       gear = kf(p, [[0, 0], [0.18, 0], [0.37, 1]]);
-      bannerCalm = kf(p, [[0, 0], [0.32, 1]]);
       bannerVis = kf(p, [[0, 1], [0.36, 1], [0.47, 0]]);
       this.green.intensity = 55 + 60 * smooth(0.55, 0.9, p);
     } else if (s.active === "work") {
@@ -323,39 +360,51 @@ export class Stage {
       const topView = smooth(0.8, 0.9, p);
       P.position.set(kf(p, [[0, 0], [0.82, 0], [0.9, 0.2], [0.985, 0]]), kf(p, [[0, -6.4], [0.07, -6.4], [0.22, -0.2], [0.78, -0.05], [0.9, -0.25]]), kf(p, [[0, 0], [0.9, -1.2]]));
       P.rotation.set(
-        kf(p, [[0, 0], [0.8, 0.1], [0.9, 1.5707]]) + py * 0.03,
+        kf(p, [[0, 0], [0.07, 0], [0.2, 0.42], [0.74, 0.42], [0.82, 0.1], [0.9, 1.5707]]) + py * 0.03, // banks toward the viewer: the cabin roof shows while the cloth cards wrap over it
         kf(p, [[0, -0.95], [0.22, -0.62], [0.8, -0.34], [0.9, -1.2]]) + px * 0.09,
         kf(p, [[0, 0.08], [0.22, 0.02], [0.8, 0.03], [0.9, 0]]) + py * 0.02,
       );
       P.scale.setScalar(0.165 * (1.02 - topView * 0.12));
       gear = 1;
       bannerVis = 0;
-      // cards glide out of the cabin door, over the wing, toward the viewer
+      // Cards are cloth. Each one starts WRAPPED over the cabin roof (it follows the plane), slides off along a curve while it
+      // unrolls and ripples, lands flat in front of the plane and then lies perfectly still until the next card replaces it.
       const n = this.cards.length;
-      const span = kf(p, [[0.2, 0], [0.8, 1]]);
-      const x = span * (n + 0.5);
+      const x = kf(p, [[0.2, 0], [0.76, 1]]) * ((n - 1) + CARD_LIFE * 0.79);
+      this.rig.updateMatrixWorld(true); P.updateMatrixWorld(true);
+      const sc = P.scale.x;
+      const roofPos = P.localToWorld(new THREE.Vector3(ROOF_X, FUS_R + 0.03, 0));
+      const roofQuat = P.quaternion.clone().multiply(ROOF_FRAME);
+      const roofUp = new THREE.Vector3(0, 0, 1).applyQuaternion(roofQuat);
+      const wrapR = (FUS_R + 0.03) * sc; // radius of the fuselage cylinder in world units
+      const flutter = 1 + 2.2 * this.windVel;
+      const end = 1 - smooth(0.74, 0.8, p);
       let best = 0, bestV = 9;
       this.cards.forEach((c, i) => {
-        const q = clamp01((x - i) / 1.55); // 0..1 life of this card
+        const q = cardLife(x, i, CARD_LIFE);
         const m = c.mesh;
-        const live = q > 0.001 && q < 0.999;
-        m.visible = live && s.work > 0.15 && s.work < 0.86;
+        const live = q > 0.002 && q < 0.998;
+        m.visible = live && p > 0.15 && p < 0.83;
         if (!live) return;
-        const e = q;
-        // path: from the fuselage belly slot -> toward camera, drooping like a ribbon
-        const a = new THREE.Vector3(0.1, -0.3, -0.2), b = new THREE.Vector3(-0.9, -1.35, 1.6), c2 = new THREE.Vector3(-1.7, -3.5, 3.9);
-        const pt = a.clone().multiplyScalar((1 - e) * (1 - e)).add(b.clone().multiplyScalar(2 * (1 - e) * e)).add(c2.clone().multiplyScalar(e * e));
-        m.position.copy(pt);
-        m.position.x += Math.sin(e * 2.6 + i) * 0.18;
-        const sc = 0.42 + 0.4 * smooth(0, 0.45, e) + 0.14 * smooth(0.7, 1, e);
-        m.scale.setScalar(sc);
-        m.rotation.set(-0.5 + e * 0.35 + py * 0.05, -0.12 + px * 0.1, -0.06 * Math.sin(e * 3 + i));
-        (m.material as THREE.MeshStandardMaterial).opacity = smooth(0, 0.12, e) * (1 - smooth(0.86, 1, e));
-        // ribbon bend
-        const base = m.userData.base as Float32Array; const pa = m.geometry.attributes.position;
-        for (let v = 0; v < pa.count; v++) { const bx = base[v * 3], by = base[v * 3 + 1]; pa.setZ(v, Math.sin(by * 0.9 + t * 1.4 + i) * 0.1 * (1 - e * 0.5) + bx * bx * 0.045); }
-        pa.needsUpdate = true; m.geometry.computeVertexNormals();
-        const d = Math.abs(q - 0.42); if (d < bestV) { bestV = d; best = i; }
+        const e = unroll(q); // 0 wrapped .. 1 flat (exactly 1 once settled)
+        // curved path: lifts off the roof, arcs out toward the viewer and settles at `front`
+        const c1 = { x: roofPos.x + roofUp.x * 0.9, y: roofPos.y + roofUp.y * 0.9, z: roofPos.z + roofUp.z * 0.9 + 0.7 };
+        const c2 = { x: this.front.x + 0.5, y: this.front.y + 0.9, z: this.front.z - 1.6 };
+        const o = cubicBezier(roofPos, c1, c2, this.front, e);
+        const quat = new THREE.Quaternion().slerpQuaternions(roofQuat, IDENTITY, e); // from lying on the roof to facing the viewer
+        fillCardGrid(this.cardBuf, CARD_NU, CARD_NV, q, t, { width: this.cardW, height: this.cardH, radius: wrapR, seed: i * 0.37, flutter });
+        const pa = m.geometry.attributes.position as THREE.BufferAttribute, ca = m.geometry.attributes.color as THREE.BufferAttribute;
+        const v3 = new THREE.Vector3();
+        for (let k = 0; k < pa.count; k++) {
+          v3.set(this.cardBuf[k * 3], this.cardBuf[k * 3 + 1], this.cardBuf[k * 3 + 2]).applyQuaternion(quat);
+          pa.setXYZ(k, v3.x + o.x, v3.y + o.y, v3.z + o.z);
+          const z = this.cardBuf[k * 3 + 2]; // folds a touch darker where the cloth dips
+          const sh = e >= 1 ? 1 : 0.86 + 0.14 * clamp01(0.5 + z / (this.cardH * 0.5));
+          ca.setXYZ(k, sh, sh, sh);
+        }
+        pa.needsUpdate = true; ca.needsUpdate = true; m.geometry.computeVertexNormals();
+        (m.material as THREE.MeshStandardMaterial).opacity = cardOpacity(q) * end;
+        const d = Math.abs(q - 0.6); if (d < bestV) { bestV = d; best = i; }
       });
       if (best !== this.workIndex && s.work > 0.18 && s.work < 0.82) { this.workIndex = best; this.onWorkIndex?.(best); }
     } else if (s.active === "cta") {
@@ -389,16 +438,23 @@ export class Stage {
     this.puffs.visible = visible;
 
     if (this.banner.visible) {
-      // "wrinkled cloth" wave that calms down as you scroll (the cloth gets ironed flat)
-      const pa = this.banner.geometry.attributes.position as THREE.BufferAttribute;
-      const amp = 1.6 * (1 - bannerCalm) + 0.16;
-      for (let i = 0; i < pa.count; i++) {
-        const bx = this.bannerBase[i * 3], by = this.bannerBase[i * 3 + 1];
-        const k = Math.min(1, -bx / 34);
-        const w = Math.sin(bx * 0.55 - t * 3.0 + by * 0.4) * amp * k + Math.sin(by * 1.7 + bx * 0.3 + t * 1.7) * amp * 0.42 * k;
-        pa.setXYZ(i, bx * (1 - 0.0), by * (0.78 + 0.22 * (1 - k * 0.4)), w + (bx < -1 ? Math.sin(bx * 0.09) * 1.2 * k : 0));
-      }
-      pa.needsUpdate = true; this.banner.geometry.computeVertexNormals();
+      // Cloth: a pennant pinned at the tail. Travelling waves grow toward the free end, a slow swell rides underneath and the tip
+      // flutters (faster while you scroll fast). It never goes rigid: the wind only changes strength with the beat.
+      const hp = s.active === "hero" ? s.hero : 0;
+      const gust = 1 + 0.16 * Math.sin(t * 0.7) + 0.08 * Math.sin(t * 1.9 + 1);
+      const opts: BannerOpts = {
+        length: BANNER_L, height: BANNER_H,
+        amp: (0.58 + 0.72 * smooth(0.12, 0.42, hp)) * gust,
+        flutter: 1 + 2.2 * this.windVel,
+        lagY: this.lagY, lagZ: this.lagZ,
+        twist: 0.2 * Math.sin(t * 0.8) + 0.04 * this.lagZ,
+      };
+      fillBannerGrid(this.bannerPos, this.bannerShade, BNU, BNV, t, opts);
+      const g = this.banner.geometry as THREE.BufferGeometry;
+      const pa = g.attributes.position as THREE.BufferAttribute, ca = g.attributes.color as THREE.BufferAttribute;
+      (pa.array as Float32Array).set(this.bannerPos);
+      for (let k = 0; k < this.bannerShade.length; k++) ca.setXYZ(k, this.bannerShade[k], this.bannerShade[k], this.bannerShade[k]);
+      pa.needsUpdate = true; ca.needsUpdate = true; g.computeVertexNormals();
       (this.banner.material as THREE.MeshStandardMaterial).opacity = bannerVis;
       this.banner.scale.x = 0.3 + 0.7 * bannerVis;
     }

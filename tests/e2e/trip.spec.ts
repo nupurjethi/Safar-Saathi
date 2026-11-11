@@ -312,7 +312,6 @@ test("8. the landing page (How it works) offers travel user and agent login; the
   await expect(page.getByTestId("hero-login-traveller")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("hero-login-agent")).toBeVisible();
   await expect(page.locator("#how")).toBeAttached();
-  await expect(page.getByTestId("how-it-works")).toHaveCount(0); // the short guide is for signed-in users
   await page.getByTestId("hero-login-agent").click();
   await page.getByTestId("demo-agent-login").click();
   await expect(page.getByTestId("agent-desk")).toBeVisible();
@@ -366,10 +365,9 @@ test("9. travel user creates an account with email + password, signs out, signs 
   await expect(page.getByText("No trips yet")).toBeVisible({ timeout: 15_000 });
 });
 
-test("10. signed-in travel user sees Home with the How it works guide; an agent is sent to the desk; sign-out returns to the landing story", async ({ page }) => {
+test("10. signed-in travel user sees Home (the trip catalogue); an agent is sent to the desk; sign-out returns to the landing story", async ({ page }) => {
   await loginAs(page, "traveller", "/");
-  await expect(page.getByTestId("how-it-works")).toBeVisible();
-  await expect(page.getByTestId("how-it-works").locator("li")).toHaveCount(5);
+  await expect(page.getByTestId("how-it-works")).toHaveCount(0); // no guide block on the signed-in home: the story is the guide, reachable from the nav
   await expect(page.getByTestId("results")).toBeVisible(); // the trip catalogue is still the home page
   await expect(page.getByTestId("hero-login-traveller")).toHaveCount(0);
   await page.getByRole("button", { name: "Sign out" }).click();

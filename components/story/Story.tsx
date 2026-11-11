@@ -60,6 +60,7 @@ export function Story({ featured, viewer = null }: { featured: Featured[]; viewe
     gsap.registerPlugin(ScrollTrigger);
     const lenis = new Lenis({ lerp: 0.085, smoothWheel: true, wheelMultiplier: 0.95 });
     lenis.on("scroll", ScrollTrigger.update);
+    (window as unknown as { __ssLenis?: unknown }).__ssLenis = lenis; // read-only handle for visual checks and tests
     // header flips to dark ink while it sits over a light section
     const lightSel = ["#how", "#why", "#moments"];
     const updateNav = () => {
@@ -70,6 +71,7 @@ export function Story({ featured, viewer = null }: { featured: Featured[]; viewe
       setNavDark((cur) => (cur === (over || heroEnd || workEnd) ? cur : over || heroEnd || workEnd));
     };
     lenis.on("scroll", updateNav);
+    lenis.on("scroll", (l: { velocity: number }) => { if (stage) stage.state.scrollVel = l.velocity; }); // the cloth flutters more while you scroll fast
     const tick = (time: number) => lenis.raf(time * 1000);
     gsap.ticker.add(tick);
     gsap.ticker.lagSmoothing(0);
@@ -92,10 +94,12 @@ export function Story({ featured, viewer = null }: { featured: Featured[]; viewe
       if (disposed || !canvas.current || !root.current) return;
       stage = new Stage(canvas.current, cards, labels);
       stage.state = initialState();
+      (window as unknown as { __ssStage?: unknown }).__ssStage = stage; // read-only handle for visual checks and tests
       stage.onWorkIndex = (i) => setWorkIdx(i);
       const fit = () => stage!.resize(innerWidth, innerHeight, devicePixelRatio || 1);
       fit(); addEventListener("resize", fit);
-      const frame = (time: number, dt: number) => stage!.frame(time / 1000, Math.min(0.05, dt / 1000));
+      // gsap.ticker passes time in SECONDS and deltaTime in MILLISECONDS (it used to be divided by 1000 twice: every animation ran 1000x too slowly, which is why the banner looked frozen)
+      const frame = (time: number, dt: number) => stage!.frame(time, Math.min(0.05, dt / 1000));
       gsap.ticker.add(frame);
       (root.current as HTMLElement & { _cleanup?: () => void })._cleanup = () => { removeEventListener("resize", fit); gsap.ticker.remove(frame); };
 

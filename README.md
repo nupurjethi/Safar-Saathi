@@ -84,7 +84,7 @@ Limits, said plainly: no live traffic or transit times, no address search offlin
 
 ### Landing page and sign-in doors
 
-`/` depends on who is looking: **not signed in** = the "How it works" scroll story with **Travel user login** and **Agent login** (header, hero and closing buttons); **travel user** = Home (the trip catalogue) with a short five-step "How Safar Saathi works" guide (`components/ui/HowItWorks.tsx`); **agent** = straight to `/agent`. The full story is always at `/story`, the public catalogue at `/explore`. The root layout reads the session so the story can bring its own header (`AppShell` `signedIn`).
+`/` depends on who is looking: **not signed in** = the "How it works" scroll story with **Travel user login** and **Agent login** (header, hero and closing buttons); **travel user** = Home (the trip catalogue); **agent** = straight to `/agent`. The full story is always at `/story`, the public catalogue at `/explore`. The root layout reads the session so the story can bring its own header (`AppShell` `signedIn`).
 
 ### Changing a flight: your own booking platform, then Confirm
 
