@@ -23,8 +23,12 @@ export function buildContext(pack: OfflinePack, now = new Date(), cityOverride?:
   const upcoming = pack.flights.filter((f) => new Date(f.depart_at) >= new Date(now.getTime() - 6 * 3600e3));
   const next = upcoming[0] ?? pack.flights[pack.flights.length - 1];
   const onward = upcoming[1];
+  const NG = "not in your documents";
   const ff = (f?: typeof next) =>
-    f && { flight_no: f.flight_no, carrier: f.carrier, from: f.from, to: f.to, pnr: f.pnr, depart: fmt(f.depart_at, f.from_tz), arrive: fmt(f.arrive_at, f.to_tz) };
+    f
+      ? { flight_no: f.flight_no || NG, carrier: f.carrier || NG, from: f.from || NG, to: f.to || NG, pnr: f.pnr || NG, depart: fmt(f.depart_at, f.from_tz), arrive: fmt(f.arrive_at, f.to_tz) }
+      // an uploaded plan may contain no flights at all: the guide still builds and says so instead of failing
+      : { flight_no: NG, carrier: NG, from: NG, to: NG, pnr: NG, depart: NG, arrive: NG };
   const hotel = pack.places[stay.hotelId];
   const airport = pack.places[stay.airportId];
   return {

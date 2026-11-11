@@ -170,3 +170,13 @@ describe("Add travel plan agent: documents -> trip -> full offline bundle", () =
     expect(after.status).toBe("failed");
   });
 });
+
+describe("a plan with no flights (e.g. a rail-and-hotel itinerary) still gets a full guide", () => {
+  it("builds the rules context with placeholders instead of failing validation", async () => {
+    const { buildContext } = await import("@/lib/rules/context");
+    const c = await setupDb();
+    const pack = (await getLatestPack(c.booking.id))!.pack as OfflinePack;
+    const ctx = buildContext({ ...pack, flights: [] }) as { current: { next_flight: Record<string, string>; onward_flight: Record<string, string> } };
+    for (const k of ["carrier", "flight_no", "depart", "pnr"]) { expect(ctx.current.next_flight[k]).toBeTruthy(); expect(ctx.current.onward_flight[k]).toBeTruthy(); }
+  });
+});
