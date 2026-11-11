@@ -126,8 +126,10 @@ h1, h2, h3, .font-display { font-family: var(--font-grotesk), var(--font-inter),
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--lime) 60%, transparent); } 100% { box-shadow: 0 0 0 18px transparent; } }
 .pulse-once { animation: pulse-ring 0.6s ease-out 1; }
 
-@keyframes blue-pulse { 0% { box-shadow: 0 0 0 0 rgba(26,115,232,0.55); } 100% { box-shadow: 0 0 0 16px rgba(26,115,232,0); } }
-.gps-dot { width: 18px; height: 18px; border-radius: 99px; background: #1a73e8; border: 3px solid #fff; animation: blue-pulse 1.8s infinite; }
+/* "You are here": neon-green core, dark ring, neon halo, dark outer ring. Readable on the light map, the dark map and over a route line. */
+@keyframes gps-pulse { 0% { transform: scale(0.6); opacity: 0.85; } 100% { transform: scale(2.6); opacity: 0; } }
+.gps-dot { position: relative; width: 24px; height: 24px; border-radius: 99px; background: #d8fd34; border: 5px solid #050505; box-shadow: 0 0 0 3px #d8fd34, 0 0 0 6px #050505, 0 3px 10px rgba(0, 0, 0, 0.55); }
+.gps-dot::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 3px solid #d8fd34; animation: gps-pulse 1.8s ease-out infinite; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }

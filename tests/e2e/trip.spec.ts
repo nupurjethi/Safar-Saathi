@@ -73,6 +73,15 @@ test("1. Explore → select → guide ready → offline guide/map/address card/S
   await page.getByTestId("route-chip").first().click();
   await page.getByTestId("locate-btn").click();
   await expect(page.getByTestId("gps-dot")).toBeVisible({ timeout: 15_000 }); // GPS works with no data
+  // the dot must sit ON the traveller's position (Playwright's fake GPS = 48.8606, 2.3376), not in a corner of the map: it is a MapLibre marker (absolutely positioned)
+  const placed = await page.evaluate(() => {
+    const m = (window as unknown as { __ssMap: { project(l: [number, number]): { x: number; y: number }; getContainer(): HTMLElement } }).__ssMap;
+    const dot = document.querySelector('[data-testid="gps-dot"]') as HTMLElement;
+    const box = m.getContainer().getBoundingClientRect(), r = dot.getBoundingClientRect();
+    return { style: getComputedStyle(dot).position, inside: r.left >= box.left && r.right <= box.right && r.top >= box.top && r.bottom <= box.bottom, bg: getComputedStyle(dot.querySelector(".gps-dot")!).backgroundColor };
+  });
+  expect(placed.style).toBe("absolute");
+  expect(placed.bg).toBe("rgb(216, 253, 52)"); // neon green core
 
   await page.goto(`/trips/${ref}/sos`);
   await expect(page.getByTestId("sos-address-card")).toBeVisible();

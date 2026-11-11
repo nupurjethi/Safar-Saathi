@@ -66,7 +66,8 @@ export function TripMap({ pack, routeId, pin, onRoute, focusCity }: { pack: Offl
         map.addLayer({ id: "routes-faint", type: "line", source: "routes", paint: { "line-color": "#6f7b8b", "line-width": 3, "line-opacity": 0.55, "line-dasharray": [1.5, 1.5] }, layout: { "line-cap": "round", "line-join": "round" } });
         map.addLayer({ id: "active-casing", type: "line", source: "active", paint: { "line-color": "#ffffff", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 7, 17, 13] }, layout: { "line-cap": "round", "line-join": "round" } });
         map.addLayer({ id: "active-line", type: "line", source: "active", paint: { "line-color": "#1a73e8", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 4, 17, 8] }, layout: { "line-cap": "round", "line-join": "round" } });
-        map.addLayer({ id: "accuracy-fill", type: "fill", source: "accuracy", paint: { "fill-color": "#1a73e8", "fill-opacity": 0.15 } });
+        map.addLayer({ id: "accuracy-fill", type: "fill", source: "accuracy", paint: { "fill-color": "#d8fd34", "fill-opacity": 0.28 } });
+        map.addLayer({ id: "accuracy-line", type: "line", source: "accuracy", paint: { "line-color": "#050505", "line-width": 2, "line-opacity": 0.75 } });
         setReady(true);
       });
       mapRef.current = map;
@@ -111,8 +112,7 @@ export function TripMap({ pack, routeId, pin, onRoute, focusCity }: { pack: Offl
     if (!gpsMarker.current) {
       const d = document.createElement("div");
       d.setAttribute("data-testid", "gps-dot");
-      d.innerHTML = `<div class="gps-dot"></div><div data-arrow style="position:absolute;left:50%;top:-10px;width:0;height:0;margin-left:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:12px solid #1a73e8;transform-origin:6px 19px;display:none"></div>`;
-      d.style.position = "relative";
+      d.innerHTML = `<div class="gps-dot"></div><div data-arrow style="position:absolute;left:50%;top:-17px;width:0;height:0;margin-left:-7px;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:14px solid #d8fd34;filter:drop-shadow(0 0 0 #050505) drop-shadow(1px 0 0 #050505) drop-shadow(-1px 0 0 #050505) drop-shadow(0 -1px 0 #050505);transform-origin:7px 30px;display:none"></div>`;
       gpsMarker.current = new ml.Marker({ element: d }).setLngLat([p.lon, p.lat]).addTo(map);
     }
     gpsMarker.current.setLngLat([p.lon, p.lat]);
