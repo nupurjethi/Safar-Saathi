@@ -23,9 +23,9 @@ export function Scramble({ text, className = "" }: { text: string; className?: s
   return <span className={className} onMouseEnter={run} onFocus={run} aria-label={text}><span aria-hidden>{out}</span></span>;
 }
 
-export function MonoLink({ href, children, className = "", prefetch }: { href: string; children: string; className?: string; prefetch?: boolean }) {
+export function MonoLink({ href, children, className = "", prefetch, testId }: { href: string; children: string; className?: string; prefetch?: boolean; testId?: string }) {
   return (
-    <Link href={href} prefetch={prefetch} data-cursor="link" className={`st-mono group inline-flex min-h-11 items-center gap-2 text-[14px] uppercase tracking-tight ${className}`}>
+    <Link href={href} prefetch={prefetch} data-testid={testId} data-cursor="link" className={`st-mono group inline-flex min-h-11 items-center gap-2 text-[14px] uppercase tracking-tight ${className}`}>
       <Scramble text={children} />
       <span aria-hidden className="inline-block transition-transform duration-300 group-hover:translate-x-1">⟶</span>
     </Link>

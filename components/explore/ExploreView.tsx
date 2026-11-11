@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { ItineraryCard } from "@/components/ui/ItineraryCard";
 import { RoleLogin } from "@/components/ui/RoleLogin";
+import { HowItWorks } from "@/components/ui/HowItWorks";
 import { Chip, EmptyState } from "@/components/ui/primitives";
 import { LinkButton } from "@/components/ui/primitives";
 import { searchItineraries, defaultStart } from "@/lib/server/catalogue";
@@ -65,6 +66,8 @@ export async function ExploreView({ searchParams, home = false }: { searchParams
           <p className="text-muted">{res.total} sample itineraries. Select one and its offline guide is saved on your phone.</p>
         </div>
       )}
+
+      {home && <HowItWorks />}
 
       <form action={home ? "/" : "/explore"} className="card grid grid-cols-2 gap-3 p-4 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]" role="search">
         <label className="col-span-2 space-y-1 text-[15px] text-muted sm:col-span-1">Destination<input name="q" defaultValue={sp.q} placeholder="Paris, Bali, Dubai…" className="mt-1 min-h-12 w-full rounded-xl border-[1.5px] border-line bg-surface-2 px-3 text-[17px] text-ink placeholder:text-muted" /></label>

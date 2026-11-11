@@ -82,6 +82,10 @@ Limits, said plainly: no live traffic or transit times, no address search offlin
 
 `npm run images:fetch` downloads openly licensed photos (CC BY, CC BY-SA, CC0, public domain) from Wikimedia Commons for the landmarks (about 130 of the 160 landmarks; places without an honest match show gradient art), keeps author, licence and file-page link, and shows the credit on every photo. Wrong-place matches were reviewed by hand and are listed in `REJECT`; hand-picked fixes are in `PICKS` (`scripts/fetch-place-images.ts`). Hotels are fictional sample data and have no photo. Photos are part of each trip's offline bundle.
 
+### Landing page and sign-in doors
+
+`/` depends on who is looking: **not signed in** = the "How it works" scroll story with **Travel user login** and **Agent login** (header, hero and closing buttons); **travel user** = Home (the trip catalogue) with a short five-step "How Safar Saathi works" guide (`components/ui/HowItWorks.tsx`); **agent** = straight to `/agent`. The full story is always at `/story`, the public catalogue at `/explore`. The root layout reads the session so the story can bring its own header (`AppShell` `signedIn`).
+
 ### Changing a flight: your own booking platform, then Confirm
 
 Flight changes no longer use sample inventory. Ask the agent to move, reschedule, rebook or cancel a flight and it shows a **platform card** (`components/chat/PlatformCard.tsx`): your booked flight, then **MakeMyTrip, Goibibo, Cleartrip and ixigo** buttons that open each platform's own flight page (same route and day) or "my trips" page in a new tab. You log in there yourself and change the ticket. Back in the app you enter the new flight (airline, number, times, PNR, fare difference and change fee you paid), which creates a **review card**; only your Yes tap updates the trip, the totals and the offline guide (`flight_external` in `lib/gate/changes.ts`, no price limit because we charge nothing, recorded as an `external` payment).

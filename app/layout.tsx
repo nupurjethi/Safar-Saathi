@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/ui/AppShell";
+import { getSession } from "@/lib/server/session";
 
 // next/font self-hosts Outfit (the reference theme's typeface) at build time, so it is served from our own origin and works offline.
 // --font-inter is the one real variable; globals.css aliases --font-grotesk and --font-jbmono to it.
@@ -19,14 +20,15 @@ export const viewport: Viewport = { themeColor: "#050505", width: "device-width"
 
 const themeInit = `try{var t=localStorage.getItem('ss-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const signedIn = !!(await getSession().catch(() => null));
   return (
     <html lang="en" className={outfit.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className="min-h-dvh">
-        <AppShell>{children}</AppShell>
+        <AppShell signedIn={signedIn}>{children}</AppShell>
       </body>
     </html>
   );

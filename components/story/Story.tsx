@@ -36,7 +36,13 @@ const MOMENTS = [
 
 const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
-export function Story({ featured }: { featured: Featured[] }) {
+/** Who is looking: null for a visitor. A signed-in person sees their own door instead of the two login buttons. */
+export type Viewer = { name: string; role: "traveller" | "agent" | "admin" } | null;
+
+export function Story({ featured, viewer = null }: { featured: Featured[]; viewer?: Viewer }) {
+  const staff = viewer?.role === "agent" || viewer?.role === "admin";
+  const doorHref = staff ? "/agent" : "/";
+  const doorLabel = staff ? "Open agent desk" : "Go to home";
   const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [ready, setReady] = useState(false);
@@ -124,7 +130,7 @@ export function Story({ featured }: { featured: Featured[] }) {
             if (i < heads.length) tl.to(h, { opacity: 0, filter: "blur(16px)", yPercent: -24, duration: 0.06 }, 0.11 + i * 0.17 + (i === 2 ? 0.0 : 0));
           });
           tl.to(".st-hero-label", { opacity: 0, duration: 0.05 }, 0.5);
-          tl.to(".st-hero-corner", { opacity: 0, y: 30, duration: 0.06 }, 0.42);
+          tl.to(".st-hero-corner", { autoAlpha: 0, y: 30, duration: 0.06 }, 0.42); // autoAlpha also hides it from clicks once it has faded
           tl.fromTo(".st-flight", { opacity: 0, yPercent: 8 }, { opacity: 1, yPercent: -6, duration: 0.2 }, 0.38);
           tl.to(".st-flight", { opacity: 0, duration: 0.1 }, 0.86);
           tl.fromTo(".st-carousel-label", { opacity: 0 }, { opacity: 1, duration: 0.06 }, 0.52);
@@ -228,17 +234,24 @@ export function Story({ featured }: { featured: Featured[] }) {
           <Link href="/" className="flex items-center gap-2" aria-label="Safar Saathi home" data-cursor="link">
             <span className="text-[22px] font-semibold tracking-[-0.04em]">safar<span className={navDark ? "text-[#4f6b00]" : "text-[#d8fd34]"}>saathi</span></span><LogoMark className="h-6 w-9" />
           </Link>
-          <nav aria-label="Main" className="hidden items-center gap-7 text-[14px] font-medium md:flex">
-            <Link href="/" data-cursor="link" className={navDark ? "text-[#4f6b00]" : "text-[#d8fd34]"}>Trips</Link>
-            <a href="#how" data-cursor="link">How it works</a>
-            <Link href="/trips" data-cursor="link">My trips</Link>
-            <Link href="/api/auth/demo?next=/trips" prefetch={false} data-cursor="link" className="rounded-full bg-[#d8fd34] px-5 py-2.5 text-[14px] font-bold text-[#050505] transition hover:brightness-95">Demo: open Neha&apos;s trip</Link>
+          <nav aria-label="Main" className="hidden items-center gap-6 text-[14px] font-medium md:flex">
+            <Link href="/explore" data-cursor="link">Trips</Link>
+            <a href="#how" data-cursor="link" className={navDark ? "text-[#4f6b00]" : "text-[#d8fd34]"}>How it works</a>
+            {viewer ? (
+              <Link href={doorHref} data-testid="story-door" data-cursor="link" className="rounded-full bg-[#d8fd34] px-5 py-2.5 text-[14px] font-bold text-[#050505] transition hover:brightness-95">{doorLabel}</Link>
+            ) : (
+              <>
+                <Link href="/login?role=traveller" prefetch={false} data-testid="nav-login-traveller" data-cursor="link" className={`rounded-full border px-4 py-2.5 ${navDark ? "border-black/25" : "border-white/30"}`}>Travel user login</Link>
+                <Link href="/login?role=agent" prefetch={false} data-testid="nav-login-agent" data-cursor="link" className="rounded-full bg-[#d8fd34] px-5 py-2.5 text-[14px] font-bold text-[#050505] transition hover:brightness-95">Agent login</Link>
+              </>
+            )}
           </nav>
           <button className="grid size-11 place-items-center md:hidden" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}><span className={`block h-px w-7 ${navDark ? "bg-[#050505] shadow-[0_8px_0_#050505]" : "bg-white shadow-[0_8px_0_#fff]"}`} /></button>
         </div>
         {menu && (
           <nav className="mx-auto mt-2 flex max-w-5xl flex-col gap-4 rounded-3xl border border-white/12 bg-black/85 px-6 pb-6 pt-5 text-[18px] font-medium text-white backdrop-blur-xl md:hidden">
-            <Link href="/" onClick={() => setMenu(false)}>Trips</Link><a href="#how" onClick={() => setMenu(false)}>How it works</a><Link href="/trips">My trips</Link><Link href="/api/auth/demo?next=/trips" prefetch={false} className="font-bold text-[#d8fd34]">Demo: open Neha&apos;s trip</Link>
+            <Link href="/explore" onClick={() => setMenu(false)}>Trips</Link><a href="#how" onClick={() => setMenu(false)}>How it works</a>
+            {viewer ? <Link href={doorHref} className="font-bold text-[#d8fd34]">{doorLabel}</Link> : <><Link href="/login?role=traveller" prefetch={false} data-testid="menu-login-traveller" className="font-bold text-[#d8fd34]">Travel user login</Link><Link href="/login?role=agent" prefetch={false} data-testid="menu-login-agent">Agent login</Link></>}
           </nav>
         )}
       </header>
@@ -285,8 +298,10 @@ export function Story({ featured }: { featured: Featured[] }) {
           <p className="mb-1 text-[11px] uppercase text-white/45">AI stack</p>
           <Marquee items={["Claude", "OpenAI", "OpenRouter"]} className="w-[210px] text-[12px] uppercase text-white/85" speed={22} />
           <div className="mt-6 flex gap-6 text-[#d8fd34]">
-            <MonoLink href="/">Start your trip</MonoLink>
-            <MonoLink href="/api/auth/demo?next=/trips" prefetch={false} className="!text-white/85">See the demo</MonoLink>
+            {viewer ? <MonoLink href={doorHref} testId="hero-door">{doorLabel}</MonoLink> : <>
+              <MonoLink href="/login?role=traveller" prefetch={false} testId="hero-login-traveller">Travel user login</MonoLink>
+              <MonoLink href="/login?role=agent" prefetch={false} testId="hero-login-agent" className="!text-white/85">Agent login</MonoLink>
+            </>}
           </div>
         </div>
         <div className="st-hero-corner absolute bottom-[7%] right-[36px] w-[min(300px,40vw)] max-md:hidden">
@@ -350,7 +365,7 @@ export function Story({ featured }: { featured: Featured[] }) {
         <div className="st-work-left absolute left-[36px] top-1/2 w-[min(290px,34vw)] -translate-y-1/2 max-md:left-5 max-md:top-[22%] max-md:w-[80vw] max-md:translate-y-0">
           <h2 className="mb-5 text-[clamp(30px,3.2vw,46px)] tracking-[-0.03em]">Ready-made trips</h2>
           <p className="mb-6 text-[15px] leading-snug text-white/75">From Paris cafés to Bali rice terraces: a sample of the 100+ trips you can book today. Prices and inventory are sample data.</p>
-          <MonoLink href="/" className="text-[#d8fd34]">View all trips</MonoLink>
+          <MonoLink href="/explore" className="text-[#d8fd34]">View all trips</MonoLink>
         </div>
         <div className="st-work-right absolute right-[36px] top-[54%] w-[min(300px,32vw)] max-md:right-5 max-md:top-auto max-md:bottom-[9%] max-md:w-[70vw]">
           <div key={f.slug} style={{ animation: "st-pill-in .55s both" }}>
@@ -391,7 +406,7 @@ export function Story({ featured }: { featured: Featured[] }) {
           </div>
           <div className="why-list col-span-12 md:col-span-3 max-md:mt-10">
             {WHY.map(([t, b]) => (<div key={t} className="st-acc-item py-4"><p className="text-[19px] leading-tight tracking-[-0.03em]">{t}</p><p className="mt-1 text-[13px] leading-snug opacity-70">{b}</p></div>))}
-            <div className="pt-6"><MonoLink href="/" className="text-[#050505]">See the trips</MonoLink></div>
+            <div className="pt-6"><MonoLink href="/explore" className="text-[#050505]">See the trips</MonoLink></div>
           </div>
         </div>
       </section>
@@ -425,13 +440,20 @@ export function Story({ featured }: { featured: Featured[] }) {
             <h2 className="text-[clamp(38px,5vw,72px)]">Let&apos;s plan your<br />first flight.</h2>
           </div>
           <div className="w-full max-w-[420px] md:text-right" data-reveal>
-            <Link href="/" data-cursor="link" className="st-mono block rounded-full bg-[#e6ff6b] px-6 py-5 text-center text-[15px] uppercase text-[#050505] transition-colors hover:bg-[#d8fd34]"><Scramble text="Start your trip ⟶" /></Link>
-            <p className="st-mono mt-4 text-[12px] uppercase text-white/55">Or <Link href="/api/auth/demo?next=/trips" prefetch={false} className="inline-flex min-h-11 items-center text-[#d8fd34] underline underline-offset-4">try the demo as Neha</Link></p>
+            {viewer ? (
+              <Link href={doorHref} data-testid="cta-door" data-cursor="link" className="st-mono block rounded-full bg-[#e6ff6b] px-6 py-5 text-center text-[15px] uppercase text-[#050505] transition-colors hover:bg-[#d8fd34]"><Scramble text={`${doorLabel} ⟶`} /></Link>
+            ) : (
+              <div className="grid gap-3">
+                <Link href="/login?role=traveller" prefetch={false} data-testid="cta-login-traveller" data-cursor="link" className="st-mono block rounded-full bg-[#e6ff6b] px-6 py-5 text-center text-[15px] uppercase text-[#050505] transition-colors hover:bg-[#d8fd34]"><Scramble text="Travel user login ⟶" /></Link>
+                <Link href="/login?role=agent" prefetch={false} data-testid="cta-login-agent" data-cursor="link" className="st-mono block rounded-full border border-white/35 px-6 py-5 text-center text-[15px] uppercase text-white transition-colors hover:border-[#d8fd34] hover:text-[#d8fd34]"><Scramble text="Agent login ⟶" /></Link>
+              </div>
+            )}
+            <p className="st-mono mt-4 text-[12px] uppercase text-white/55">Or <Link href="/api/auth/demo?next=/trips" prefetch={false} className="inline-flex min-h-11 items-center text-[#d8fd34] underline underline-offset-4">try the demo as Neha</Link> · <Link href="/explore" className="inline-flex min-h-11 items-center text-[#d8fd34] underline underline-offset-4">browse trips</Link></p>
           </div>
         </div>
         <div className="st-container st-mono relative z-10 flex flex-wrap items-end justify-between gap-4 text-[12px] uppercase text-white/55">
           <p>© 2026 Safar Saathi · Prototype · Sample data · Test payments only</p>
-          <p className="flex gap-5 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center"><Link href="/">Explore</Link><Link href="/trips">My trips</Link><Link href="/login">Sign in</Link><Link href="/admin/cases">Admin</Link></p>
+          <p className="flex gap-5 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center"><Link href="/explore">Explore</Link><Link href="/login?role=traveller" prefetch={false}>Travel user login</Link><Link href="/login?role=agent" prefetch={false}>Agent login</Link></p>
         </div>
       </section>
     </div>

@@ -21,7 +21,7 @@ html.lenis, html.lenis body { height:auto; }
 @keyframes st-pill-in { from { opacity:0; transform:translateY(10px) scale(.96); } to { opacity:1; transform:none; } }
 .st-flight { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .st-flight path { fill:none; stroke:#fff; stroke-opacity:.34; stroke-width:1.2; stroke-dasharray:2 9; }
-.st-quote { position:absolute; inset:0; display:grid; place-items:center; text-align:center; padding:0 6vw; color:var(--st-rich); }
+.st-quote { pointer-events:none; position:absolute; inset:0; display:grid; place-items:center; text-align:center; padding:0 6vw; color:var(--st-rich); }
 
 /* light sections */
 .st-light { background:var(--st-light); color:var(--st-rich); }

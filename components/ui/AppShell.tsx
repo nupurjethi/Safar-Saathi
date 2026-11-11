@@ -9,14 +9,16 @@ import { useNetwork } from "@/lib/offline/network-state";
 
 type Me = { id: string; name: string; role: string } | null;
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, signedIn = false }: { children: React.ReactNode; signedIn?: boolean }) {
   const path = usePathname();
   const router = useRouter();
   const [me, setMe] = useState<Me | undefined>(undefined);
   const [theme, setTheme] = useState<"dark" | "light" | "system">("system");
   const { status } = useNetwork();
   const inTrip = /^\/trips\/SS-/.test(path);
-  const isStory = path === "/story"; // the landing story brings its own header, cursor and scroll
+  // The scroll story ("How it works") brings its own header, cursor and scroll. It is the landing page for visitors who are not signed in.
+  const isStory = path === "/story" || (path === "/" && !signedIn);
+  const tripsHref = signedIn ? "/" : "/explore";
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
@@ -44,6 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     await fetch("/api/auth/logout", { method: "POST" });
     setMe(null);
     router.push("/");
+    router.refresh(); // re-read the session on the server so "/" shows the visitor landing page
   };
   const staff = me && (me.role === "admin" || me.role === "agent");
 
@@ -57,7 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <span className="hidden items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1 text-[12px] font-medium uppercase tracking-wide text-muted lg:inline-flex" title="All trips, prices, flights and hotels are sample data from our own mock travel API."><span aria-hidden className="size-1.5 rounded-full bg-lime" />Sample data · test payment</span>
           <nav aria-label="Primary" className="ml-4 hidden items-center gap-6 text-[14px] font-medium sm:flex [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center">
-            <Link href="/" className={path === "/" || path.startsWith("/explore") || path.startsWith("/itinerary") ? "text-accent" : "text-ink hover:text-accent"}>Trips</Link>
+            <Link href={tripsHref} className={path === "/" || path.startsWith("/explore") || path.startsWith("/itinerary") ? "text-accent" : "text-ink hover:text-accent"}>Trips</Link>
             <Link href="/trips" className={path.startsWith("/trips") ? "text-accent" : "text-ink hover:text-accent"}>My trips</Link>
             {staff && <Link href="/agent" className={path.startsWith("/agent") ? "text-accent" : "text-ink hover:text-accent"}>Agent desk</Link>}
             {staff && <Link href="/admin/cases" className={path.startsWith("/admin") ? "text-accent" : "text-ink hover:text-accent"}>Admin</Link>}
@@ -81,7 +84,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {!inTrip && (
         <nav aria-label="Main" className="no-print fixed inset-x-3 bottom-3 z-40 rounded-full border border-line bg-bg/85 pb-safe backdrop-blur-xl sm:static sm:border-0 sm:bg-transparent sm:pb-0">
           <ul className="mx-auto flex max-w-md items-stretch justify-around sm:hidden">
-            <NavItem href="/" icon={<Compass size={22} strokeWidth={1.75} />} label="Trips" active={path === "/" || path.startsWith("/explore") || path.startsWith("/itinerary")} />
+            <NavItem href={tripsHref} icon={<Compass size={22} strokeWidth={1.75} />} label="Trips" active={path === "/" || path.startsWith("/explore") || path.startsWith("/itinerary")} />
             <NavItem href="/trips" icon={<Luggage size={22} strokeWidth={1.75} />} label="My Trips" active={path.startsWith("/trips")} />
             {staff && <NavItem href="/agent" icon={<Shield size={22} strokeWidth={1.75} />} label="Agent desk" active={path.startsWith("/agent") || path.startsWith("/admin")} />}
           </ul>

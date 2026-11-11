@@ -305,12 +305,15 @@ test("7. offline assistant: with no network the chat answers from the saved bund
   await context.setOffline(false);
 });
 
-test("8. first page offers travel user and agent login; the agent desk raises an alert when an SOS text arrives", async ({ page }) => {
+test("8. the landing page (How it works) offers travel user and agent login; the agent desk raises an alert when an SOS text arrives", async ({ page }) => {
   await page.context().clearCookies();
   await page.goto("/");
-  await expect(page.getByTestId("role-login")).toBeVisible();
-  await expect(page.getByTestId("login-traveller")).toBeVisible();
-  await page.getByTestId("login-agent").click();
+  // visitors land on the "How it works" story, which offers both logins up front
+  await expect(page.getByTestId("hero-login-traveller")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("hero-login-agent")).toBeVisible();
+  await expect(page.locator("#how")).toBeAttached();
+  await expect(page.getByTestId("how-it-works")).toHaveCount(0); // the short guide is for signed-in users
+  await page.getByTestId("hero-login-agent").click();
   await page.getByTestId("demo-agent-login").click();
   await expect(page.getByTestId("agent-desk")).toBeVisible();
   await expect(page).toHaveURL(/\/agent$/);
@@ -361,4 +364,16 @@ test("9. travel user creates an account with email + password, signs out, signs 
   await page.getByTestId("pw-submit").click();
   await expect(page).toHaveURL(/\/trips$/);
   await expect(page.getByText("No trips yet")).toBeVisible({ timeout: 15_000 });
+});
+
+test("10. signed-in travel user sees Home with the How it works guide; an agent is sent to the desk; sign-out returns to the landing story", async ({ page }) => {
+  await loginAs(page, "traveller", "/");
+  await expect(page.getByTestId("how-it-works")).toBeVisible();
+  await expect(page.getByTestId("how-it-works").locator("li")).toHaveCount(5);
+  await expect(page.getByTestId("results")).toBeVisible(); // the trip catalogue is still the home page
+  await expect(page.getByTestId("hero-login-traveller")).toHaveCount(0);
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByTestId("hero-login-traveller")).toBeVisible({ timeout: 20_000 }); // back on the landing story
+  await loginAs(page, "agent", "/");
+  await expect(page).toHaveURL(/\/agent$/);
 });
