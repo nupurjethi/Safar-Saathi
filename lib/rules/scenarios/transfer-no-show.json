@@ -1,0 +1,17 @@
+{
+  "id": "transfer-no-show", "title": "Pickup didn't come", "icon": "car", "severity": 2, "sos": false, "fallback": "sos",
+  "when": "Your airport pickup driver is not there.",
+  "steps": [
+    { "text": "Wait in the arrivals area. Your pickup code is {{current.driver.pickup_code}}.", "action": { "type": "show", "ref": "current.driver.pickup_code" } },
+    { "text": "Call your driver {{current.driver.name}} from {{current.driver.vendor}}.", "action": { "type": "call", "ref": "current.driver.phone", "label": "Pickup driver" } },
+    { "text": "Planned pickup: {{current.driver.pickup_time}}, to {{current.hotel.name}}." }
+  ],
+  "ask": { "question": "Did the driver answer?", "options": [ { "label": "Yes, on the way", "branch": "coming" }, { "label": "No answer after 15 minutes", "branch": "noanswer" } ] },
+  "branches": [
+    { "id": "coming", "label": "Yes, on the way", "steps": [ { "text": "Stay in the arrivals hall and share your spot with the driver." } ] },
+    { "id": "noanswer", "label": "No answer after 15 minutes", "steps": [
+      { "text": "Take an official airport taxi and show this address to the driver.", "action": { "type": "show", "ref": "current.hotel.address_local" } },
+      { "text": "Keep the receipt. Ask about it in the trip chat when you have data." },
+      { "text": "If you need help now, tap SOS." } ] }
+  ]
+}

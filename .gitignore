@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.data/
+.env*.local
+.env
+test-results/
+playwright-report/
+public/tiles/*.pmtiles
+public/map/maplibre-gl-worker.mjs

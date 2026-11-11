@@ -1,0 +1,18 @@
+{
+  "id": "lost-passport", "title": "Lost passport", "icon": "passport", "severity": 1, "sos": true, "fallback": "sos",
+  "when": "Your passport is lost or stolen.",
+  "steps": [
+    { "text": "Stay calm and go to a safe place. Tap SOS now to reach a person." },
+    { "text": "Tell the local police and get a written report. Police number: {{current.emergency.police}}.", "action": { "type": "call", "ref": "current.emergency.police", "label": "Police" } },
+    { "text": "Contact your consulate: {{current.consulate.name}}. Address: {{current.consulate.address}}.", "action": { "type": "call", "ref": "current.consulate.phone", "label": "Consulate" } },
+    { "text": "Keep a photo of your passport page if you saved one. Your trip reference is {{booking.ref}}." },
+    { "text": "Tell your hotel {{current.hotel.name}} and your airline.", "action": { "type": "call", "ref": "contacts.airline_phone", "label": "Airline" } }
+  ],
+  "ask": { "question": "Is your flight in the next 3 days?", "options": [ { "label": "Yes", "branch": "soon" }, { "label": "No", "branch": "later" } ] },
+  "branches": [
+    { "id": "soon", "label": "Yes", "steps": [
+      { "text": "Ask the consulate for an emergency travel document as soon as it opens. Give your flight date." },
+      { "text": "Our team can help move your flight. Tap SOS to start." } ] },
+    { "id": "later", "label": "No", "steps": [ { "text": "Ask the consulate about the steps and the fee. Keep the police report with you." } ] }
+  ]
+}

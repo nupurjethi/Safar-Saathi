@@ -1,0 +1,18 @@
+{
+  "id": "medical-help", "title": "Medical help", "icon": "heart-pulse", "severity": 1, "sos": true, "fallback": "sos",
+  "when": "Someone is ill or hurt.",
+  "steps": [
+    { "text": "If it is an emergency, call {{current.emergency.ambulance}} now.", "action": { "type": "call", "ref": "current.emergency.ambulance", "label": "Ambulance" } },
+    { "text": "Emergency number in {{current.city}}: {{current.emergency.general}}. Police: {{current.emergency.police}}.", "action": { "type": "call", "ref": "current.emergency.general", "label": "Emergency" } },
+    { "text": "Tap SOS to alert our team. A person must speak to you before the case closes." },
+    { "text": "Call your travel insurance helpline. Keep booking reference {{booking.ref}} ready.", "action": { "type": "call", "ref": "contacts.insurance_phone", "label": "Travel insurance" } },
+    { "text": "Say your location: {{current.hotel.address}}. Or show this address in the local script.", "action": { "type": "show", "ref": "current.hotel.address_local" } }
+  ],
+  "ask": { "question": "Is it life-threatening?", "options": [ { "label": "Yes", "branch": "urgent" }, { "label": "No, but I need a doctor", "branch": "doctor" } ] },
+  "branches": [
+    { "id": "urgent", "label": "Yes", "steps": [ { "text": "Call {{current.emergency.ambulance}} first. Then tap SOS." } ] },
+    { "id": "doctor", "label": "No, but I need a doctor", "steps": [
+      { "text": "Ask your hotel front desk for the nearest doctor or clinic.", "action": { "type": "call", "ref": "current.hotel.phone", "label": "Hotel" } },
+      { "text": "Keep all receipts and reports for your insurance claim." } ] }
+  ]
+}

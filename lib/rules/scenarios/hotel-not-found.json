@@ -1,0 +1,21 @@
+{
+  "id": "hotel-not-found", "title": "Can't find my hotel", "icon": "hotel", "severity": 3, "sos": false, "fallback": "sos",
+  "when": "You are in {{current.city}} and cannot find the hotel.",
+  "showCard": { "ref": "current.hotel.address_local" },
+  "steps": [
+    { "text": "Show this address to a taxi driver or a local. It is in the local script.", "action": { "type": "show", "ref": "current.hotel.address_local" } },
+    { "text": "Hotel: {{current.hotel.name}}. Address: {{current.hotel.address}}." },
+    { "text": "Call the hotel and ask the staff to guide you.", "action": { "type": "call", "ref": "current.hotel.phone", "label": "Hotel" } },
+    { "text": "Open the saved route on the map.", "action": { "type": "map", "ref": "current.hotel" } }
+  ],
+  "ask": { "question": "Are you in the right area?", "options": [ { "label": "Yes, but I can't see it", "branch": "near" }, { "label": "No, I'm lost", "branch": "lost" } ] },
+  "branches": [
+    { "id": "near", "label": "Yes, but I can't see it", "steps": [
+      { "text": "Ask a nearby shop for {{current.hotel.name}} and point to the address card." },
+      { "text": "Call the hotel. The staff can come and meet you.", "action": { "type": "call", "ref": "current.hotel.phone", "label": "Hotel" } } ] },
+    { "id": "lost", "label": "No, I'm lost", "steps": [
+      { "text": "Turn on your phone location. The blue dot works with no mobile data." },
+      { "text": "Open the map and follow the saved route to the hotel.", "action": { "type": "map", "ref": "current.hotel" } },
+      { "text": "Or take a taxi and show the address card." } ] }
+  ]
+}

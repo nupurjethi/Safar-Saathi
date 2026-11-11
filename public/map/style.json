@@ -1,0 +1,7 @@
+{
+  "version": 8,
+  "name": "Safar Saathi base (no tiles)",
+  "metadata": { "attribution": "© OpenStreetMap contributors" },
+  "sources": {},
+  "layers": [{ "id": "background", "type": "background", "paint": { "background-color": "#1b1b20" } }]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "flight-delayed", "title": "Flight delayed", "icon": "plane", "severity": 3, "sos": false, "fallback": "sos",
+  "when": "Your flight left late or the board shows a new time.",
+  "steps": [
+    { "text": "Stay calm. A delay is common and you have options." },
+    { "text": "Your flight: {{current.next_flight.carrier}} {{current.next_flight.flight_no}}, booked time {{current.next_flight.depart}}." },
+    { "text": "Keep your airline booking code ready: {{current.next_flight.pnr}}.", "action": { "type": "show", "ref": "current.next_flight.pnr" } },
+    { "text": "Call the airline to check the new time.", "action": { "type": "call", "ref": "contacts.airline_phone", "label": "Airline" } },
+    { "text": "Tell your pickup driver you will be late.", "action": { "type": "call", "ref": "current.driver.phone", "label": "Pickup driver" } }
+  ],
+  "ask": { "question": "How long is the delay?", "options": [
+    { "label": "Under 2 hours", "branch": "short" }, { "label": "2 hours or more", "branch": "long" }, { "label": "I will miss my next flight", "branch": "miss" } ] },
+  "branches": [
+    { "id": "short", "label": "Under 2 hours", "steps": [ { "text": "Stay near your gate. Gates can change." }, { "text": "Eat and drink something while you wait." } ] },
+    { "id": "long", "label": "2 hours or more", "steps": [
+      { "text": "Go to the airline desk and ask for a meal voucher or a hotel for the wait." },
+      { "text": "Keep every receipt for a travel insurance claim.", "action": { "type": "call", "ref": "contacts.insurance_phone", "label": "Travel insurance" } } ] },
+    { "id": "miss", "label": "I will miss my next flight", "steps": [
+      { "text": "Do not leave the airport. Go straight to the airline desk and ask to be rebooked." },
+      { "text": "Your next booked flight: {{current.onward_flight.carrier}} {{current.onward_flight.flight_no}}, {{current.onward_flight.depart}}." },
+      { "text": "If you are still stuck, tap SOS." } ] }
+  ]
+}

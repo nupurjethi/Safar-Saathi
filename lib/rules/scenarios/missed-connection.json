@@ -1,0 +1,22 @@
+{
+  "id": "missed-connection", "title": "Missed connection", "icon": "route", "severity": 2, "sos": false, "fallback": "sos",
+  "when": "You reached the airport too late for your onward flight.",
+  "steps": [
+    { "text": "Go to the airline transfer or rebooking desk now and say you missed your connection." },
+    { "text": "Your onward flight: {{current.onward_flight.carrier}} {{current.onward_flight.flight_no}}, {{current.onward_flight.from}} to {{current.onward_flight.to}}, {{current.onward_flight.depart}}." },
+    { "text": "Show your booking code {{current.onward_flight.pnr}} and trip reference {{booking.ref}}.", "action": { "type": "show", "ref": "current.onward_flight.pnr" } },
+    { "text": "Call the airline.", "action": { "type": "call", "ref": "contacts.airline_phone", "label": "Airline" } }
+  ],
+  "ask": { "question": "What did the desk say?", "options": [
+    { "label": "They rebooked me", "branch": "rebooked" }, { "label": "No seats today", "branch": "noseats" }, { "label": "No one is at the desk", "branch": "nodesk" } ] },
+  "branches": [
+    { "id": "rebooked", "label": "They rebooked me", "steps": [
+      { "text": "Take a photo of the new boarding pass." },
+      { "text": "Tell your driver in {{current.city}} about the new arrival time.", "action": { "type": "call", "ref": "current.driver.phone", "label": "Pickup driver" } } ] },
+    { "id": "noseats", "label": "No seats today", "steps": [
+      { "text": "Ask for a hotel and meals for tonight. Keep every receipt." },
+      { "text": "Call your travel insurance helpline.", "action": { "type": "call", "ref": "contacts.insurance_phone", "label": "Travel insurance" } },
+      { "text": "If you need a person, tap SOS to reach our team." } ] },
+    { "id": "nodesk", "label": "No one is at the desk", "steps": [ { "text": "Call the airline number above. If nobody answers, tap SOS." } ] }
+  ]
+}

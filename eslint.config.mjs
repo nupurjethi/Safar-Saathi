@@ -6,7 +6,13 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // Override default ignores of eslint-config-next.
+  {
+    // Effects here deliberately sync with external systems (IndexedDB, network heartbeat, geolocation).
+    rules: { "react-hooks/set-state-in-effect": "off" },
+  },
   globalIgnores([
+    "public/sw.js",
+    "public/map/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
