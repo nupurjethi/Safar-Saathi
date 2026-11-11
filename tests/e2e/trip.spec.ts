@@ -517,3 +517,31 @@ test("14. My trips: delete a trip (with a confirmation), and the others stay", a
   await expect(page.locator('[data-testid="trip-card"]', { hasText: ref })).toHaveCount(0);
   await expect(page.locator('[data-testid="trip-card"]', { hasText: "SS-48213" })).toBeVisible();
 });
+
+test("15. stays signed in: offline the app still knows you, opens straight to your trips, and saved pages open instantly", async ({ page, context }) => {
+  await loginAs(page, "traveller", "/trips/SS-48213");
+  await expect(page.getByTestId("offline-ready")).toHaveText("Offline guide ready", { timeout: 60_000 });
+  await page.goto("/"); // lets the app note who is signed in and saves the home page too
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  expect(await page.evaluate(() => localStorage.getItem("ss-user"))).toContain("Neha");
+  // the session cookie lasts a year (renewed with use), not a month
+  const cookie = (await context.cookies()).find((c) => c.name === "ss_session")!;
+  expect(cookie.expires - Date.now() / 1000).toBeGreaterThan(300 * 86400);
+
+  await context.setOffline(true);
+  await page.goto("/"); // the saved home page opens with no network and does not show the visitor landing
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("hero-login-traveller")).toHaveCount(0);
+  await page.goto("/trips");
+  await expect(page.getByTestId("trip-card").first()).toBeVisible();
+  const t0 = Date.now();
+  await page.goto(`/trips/SS-48213/guide`);
+  await expect(page.getByTestId("scenario-grid")).toBeVisible();
+  expect(Date.now() - t0).toBeLessThan(2500); // a saved page opens straight from the phone
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible(); // still signed in after a reload with no network
+  await context.setOffline(false);
+  // signing out clears the note: offline later the visitor landing shows again
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("ss-user"))).toBeNull();
+});

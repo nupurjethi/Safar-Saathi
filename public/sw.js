@@ -117,7 +117,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (req.mode === "navigate") {
-    event.respondWith(navigation(req, url));
+    event.respondWith(navigation(req, url, event));
   }
 });
 
@@ -132,12 +132,17 @@ async function cacheFirst(req, name) {
 
 const CACHEABLE_PAGES = /^\/(trips(\/|$)|offline$|explore$|login$|$)/;
 
-async function navigation(req, url) {
+async function navigation(req, url, event) {
   const shell = await caches.open(SHELL);
+  // A saved trip page opens instantly from the phone (no waiting on a slow or half-dead connection) and is refreshed quietly behind the scenes.
+  if (url.pathname.startsWith("/trips") || url.pathname === "/explore") {
+    const saved = await shell.match(url.pathname);
+    if (saved) { event.waitUntil(cacheUrls([url.pathname]).catch(() => {})); return saved; }
+  }
   try {
     const res = await Promise.race([
       fetch(req),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 2500)),
     ]);
     if (res.ok && CACHEABLE_PAGES.test(url.pathname) && !res.redirected) shell.put(url.pathname, res.clone());
     return res;
@@ -162,14 +167,15 @@ async function fromPackFiles(req, url) {
   if (!range) return hit;
   const m = /bytes=(\d+)-(\d*)/.exec(range);
   if (!m) return hit;
-  const buf = await hit.arrayBuffer();
+  const blob = await hit.blob(); // disk-backed: slicing it does not copy the whole file into the worker's memory
+  const size = blob.size;
   const start = Number(m[1]);
-  const end = m[2] ? Math.min(Number(m[2]), buf.byteLength - 1) : buf.byteLength - 1;
-  return new Response(buf.slice(start, end + 1), {
+  const end = m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  return new Response(blob.slice(start, end + 1), {
     status: 206,
     headers: {
       "Content-Type": hit.headers.get("Content-Type") || "application/octet-stream",
-      "Content-Range": `bytes ${start}-${end}/${buf.byteLength}`,
+      "Content-Range": `bytes ${start}-${end}/${size}`,
       "Content-Length": String(end - start + 1),
       "Accept-Ranges": "bytes",
     },

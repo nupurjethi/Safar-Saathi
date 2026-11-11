@@ -8,21 +8,21 @@ import { GateError } from "@/lib/gate/errors";
 export const SESSION_COOKIE = "ss_session";
 const secret = () => new TextEncoder().encode(process.env.AUTH_SECRET || "dev-only-secret-change-me-before-deploying");
 
-export type Session = { uid: string; role: "traveller" | "agent" | "admin"; name: string };
+export type Session = { uid: string; role: "traveller" | "agent" | "admin"; name: string; iat?: number };
 
 export async function signSession(user: { id: string; role: string; name: string }) {
   return new SignJWT({ role: user.role, name: user.name })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
-    .setExpirationTime("30d")
+    .setExpirationTime("365d")
     .sign(secret());
 }
 
 export async function setSessionCookie(user: { id: string; role: string; name: string }) {
   const jar = await cookies();
   jar.set(SESSION_COOKIE, await signSession(user), {
-    httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 30,
+    httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 365,
   });
 }
 
@@ -35,7 +35,7 @@ export async function getSession(): Promise<Session | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret());
-    return { uid: String(payload.sub), role: payload.role as Session["role"], name: String(payload.name ?? "") };
+    return { uid: String(payload.sub), role: payload.role as Session["role"], name: String(payload.name ?? ""), iat: typeof payload.iat === "number" ? payload.iat : undefined };
   } catch {
     return null;
   }

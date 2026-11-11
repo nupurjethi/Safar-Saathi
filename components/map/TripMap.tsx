@@ -15,6 +15,8 @@ const fmtDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${M
 const cardinal = (b: number) => ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][Math.round(b / 45) % 8];
 
 let protocolReady = false;
+let protocolRef: import("pmtiles").Protocol | null = null;
+const registered = new Set<string>();
 
 export function TripMap({ pack, routeId, pin, onRoute, focusCity }: { pack: OfflinePack; routeId: string | null; pin: string | null; onRoute: (id: string | null) => void; focusCity?: string }) {
   const el = useRef<HTMLDivElement>(null);
@@ -42,15 +44,27 @@ export function TripMap({ pack, routeId, pin, onRoute, focusCity }: { pack: Offl
     let cancelled = false;
     (async () => {
       const ml = await import("maplibre-gl");
-      const { Protocol } = await import("pmtiles");
+      const { Protocol, PMTiles } = await import("pmtiles");
+      const { cachedBlob, CacheSource } = await import("@/lib/map/cache-source");
       if (cancelled || !el.current) return;
       mlRef.current = ml;
       if (!protocolReady) {
         const protocol = new Protocol();
+        protocolRef = protocol;
         ml.addProtocol("pmtiles", protocol.tile);
         ml.setWorkerUrl("/map/maplibre-gl-worker.mjs"); // served from our origin and cached for offline (see scripts/copy-map-assets.mjs)
         protocolReady = true;
       }
+      // Saved map files are read straight from the phone's storage (small slices, no service worker): fast and light on memory.
+      const origin = location.origin;
+      for (const c of pack.map.cities) for (const f of [c.pmtiles, c.core?.pmtiles]) {
+        if (!f || !protocolRef) continue;
+        const abs = new URL(f, origin).href;
+        if (registered.has(abs)) continue;
+        const blob = await cachedBlob(abs);
+        if (blob) { protocolRef.add(new PMTiles(new CacheSource(abs, blob))); registered.add(abs); }
+      }
+      if (cancelled || !el.current) return;
       const dark = document.documentElement.getAttribute("data-theme") !== "light" && !(document.documentElement.getAttribute("data-theme") === null && window.matchMedia("(prefers-color-scheme: light)").matches);
       const first = pack.map.cities.find((c) => c.id === focusCity) ?? pack.map.cities[0];
       const map = new ml.Map({

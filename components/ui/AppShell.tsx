@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { NetworkBadge } from "./NetworkBadge";
 import { LogoMark } from "@/components/story/parts";
 import { flushSos } from "@/lib/offline/outbox";
+import { rememberedUser, rememberUser } from "@/lib/offline/session-flag";
 import { useNetwork } from "@/lib/offline/network-state";
 
 type Me = { id: string; name: string; role: string } | null;
@@ -31,9 +32,19 @@ export function AppShell({ children, signedIn = false }: { children: React.React
 
   useEffect(() => {
     if (status !== "online") return;
-    fetch("/api/me", { cache: "no-store" }).then((r) => r.json()).then((j) => setMe(j.user ?? null)).catch(() => setMe((m) => m ?? null));
+    fetch("/api/me", { cache: "no-store" }).then((r) => r.json()).then((j) => { setMe(j.user ?? null); rememberUser(j.user ?? null); }).catch(() => setMe((m) => m ?? null));
     void flushSos().then((sent) => { if (sent.length) window.dispatchEvent(new CustomEvent("ss-sos-sent", { detail: sent })); });
   }, [status, path]);
+
+  // With no network the server cannot say who is signed in: trust the note saved when it last did, so the app stays signed in.
+  useEffect(() => {
+    const r = rememberedUser();
+    if (r && status !== "online") {
+      setMe((m) => m ?? { id: r.id, name: r.name, role: r.role });
+      // the cached "/" may be the visitor landing page: a signed-in traveller goes straight to their trips
+      if (path === "/" && !signedIn) router.replace(r.role === "traveller" ? "/trips" : "/agent");
+    }
+  }, [status, path, signedIn, router]);
 
   const toggleTheme = useCallback(() => {
     const dark = document.documentElement.getAttribute("data-theme") ? document.documentElement.getAttribute("data-theme") === "dark" : !window.matchMedia("(prefers-color-scheme: light)").matches;
@@ -45,6 +56,7 @@ export function AppShell({ children, signedIn = false }: { children: React.React
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
+    rememberUser(null);
     setMe(null);
     router.push("/");
     router.refresh(); // re-read the session on the server so "/" shows the visitor landing page
