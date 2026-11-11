@@ -4,13 +4,18 @@ import { useState } from "react";
 import { Badge, Button } from "@/components/ui/primitives";
 import { inr } from "@/lib/time";
 import type { PlatformsPart } from "./PlatformCard";
+import { useSelectedPlatform } from "./platform-choice";
+
+type PlatformPrice = { platform: string; name: string; totalInr: number; url: string };
 
 export type ComparePart = {
   t: "compare"; bookingRef: string; itemId: string;
   query: { from: string; to: string; date: string; pax: number };
+  /** true: sample fares from the Safar Saathi mock partner API (not live). */
+  sample?: boolean;
   flight: PlatformsPart["flight"];
   providers: { name: string; ok: boolean; count: number; error?: string }[];
-  offers: { id: string; providerLabel: string; source: string; totalInr: number; perTravellerInr: number; breakup: { label: string; amountInr: number }[]; facts: { carrier: string; flightNo: string; from: string; to: string; departLocal: string; arriveLocal: string; stops: number; durationMin?: number }; validUntil: string }[];
+  offers: { id: string; providerLabel: string; source: string; totalInr: number; perTravellerInr: number; breakup: { label: string; amountInr: number }[]; facts: { carrier: string; flightNo: string; from: string; to: string; departLocal: string; arriveLocal: string; stops: number; durationMin?: number }; validUntil: string; platformPrices?: PlatformPrice[] }[];
   cheapestId?: string; fastestId?: string;
   platforms: PlatformsPart["platforms"];
 };
@@ -28,11 +33,14 @@ export function CompareCard({ part, online, onRecord }: { part: ComparePart; onl
   const [pick, setPick] = useState(part.cheapestId ?? part.offers[0]?.id);
   const chosen = part.offers.find((o) => o.id === pick) ?? part.offers[0];
   const [recorded, setRecorded] = useState(false);
+  const selected = useSelectedPlatform();
+  const selPlatform = part.platforms.find((p) => p.id === selected);
+  const selPrice = chosen?.platformPrices?.find((p) => p.platform === selected);
   return (
     <section aria-label="Flight price comparison" data-testid="compare-card" className="card-2 space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[20px] font-semibold">Compare flights</h3>
-        <Badge tone="ok">Live fares</Badge>
+        <Badge tone={part.sample ? "warn" : "ok"}>{part.sample ? "Sample fares" : "Live fares"}</Badge>
       </div>
       <p className="text-[15px] text-muted">{part.query.from} to {part.query.to} · {day(`${part.query.date}T00:00`)} · {part.query.pax} traveller{part.query.pax > 1 ? "s" : ""} · from {part.providers.filter((p) => p.ok).map((p) => p.name).join(" + ") || "no source"}{part.providers.some((p) => !p.ok) ? ` (${part.providers.filter((p) => !p.ok).map((p) => p.name).join(", ")} did not answer)` : ""}</p>
 
@@ -58,20 +66,31 @@ export function CompareCard({ part, online, onRecord }: { part: ComparePart; onl
           ))}
         </ul>
       ) : <p className="rounded-xl border border-warn p-3 text-[15px]">No flights came back for that route and day. Try another date, or open a platform below and search there.</p>}
-      <p className="text-[13px] text-muted">Reference fares from official price APIs ({chosen?.source ?? "see source"}). MakeMyTrip, Goibibo, Cleartrip and ixigo can show a different price for the same flight, so check it there before you pay.</p>
+      <p className="text-[13px] text-muted" data-testid="compare-source">{part.sample
+        ? "Sample fares from the Safar Saathi mock partner API, not live prices. The per-platform prices are samples too: check the real price on the platform before you pay."
+        : `Reference fares from official price APIs (${chosen?.source ?? "see source"}). MakeMyTrip, Goibibo, Cleartrip and ixigo can show a different price for the same flight, so check it there before you pay.`}</p>
 
       <div className="space-y-2">
-        <p className="text-[15px] font-semibold">Book it where you like, and pay there</p>
+        {selPlatform ? (
+          <a href={selPrice?.url ?? selPlatform.searchUrl} target="_blank" rel="noopener noreferrer" data-testid="pay-on-platform" className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-lime px-4 text-center text-[16px] font-bold text-lime-ink">
+            Pay on {selPlatform.name}{selPrice ? ` · ${inr(selPrice.totalInr)}${part.sample ? " (sample)" : ""}` : ""} <ExternalLink size={16} />
+          </a>
+        ) : <p className="rounded-xl border border-warn p-3 text-[15px]" data-testid="pay-choose-platform">Choose the platform you are logged in to at the top of the chat, and I will open it for you to pay.</p>}
+        <p className="text-[15px] font-semibold">{chosen?.platformPrices ? "Sample price on each platform" : "Book it where you like, and pay there"}</p>
         <ul className="grid gap-2 sm:grid-cols-2" data-testid="compare-platforms">
-          {part.platforms.map((p) => (
-            <li key={p.id}>
-              <a href={p.searchUrl} target="_blank" rel="noopener noreferrer" data-testid="compare-open" className="flex min-h-12 items-center justify-between gap-2 rounded-xl border-[1.5px] border-line bg-surface px-3 text-[16px] font-semibold hover:border-muted">
-                <span>{p.name}{p.connected ? <span className="ml-2 text-[13px] font-normal text-ok">logged in</span> : null}</span><ExternalLink size={16} />
-              </a>
-            </li>
-          ))}
+          {part.platforms.map((p) => {
+            const price = chosen?.platformPrices?.find((x) => x.platform === p.id);
+            return (
+              <li key={p.id}>
+                <a href={price?.url ?? p.searchUrl} target="_blank" rel="noopener noreferrer" data-testid="compare-open" className={`flex min-h-12 items-center justify-between gap-2 rounded-xl border-[1.5px] bg-surface px-3 text-[16px] font-semibold hover:border-muted ${p.id === selected ? "border-lime" : "border-line"}`}>
+                  <span>{p.name}{p.id === selected ? <span className="ml-2 text-[13px] font-normal text-ok">logged in</span> : null}</span>
+                  <span className="inline-flex items-center gap-2">{price ? inr(price.totalInr) : null}<ExternalLink size={16} /></span>
+                </a>
+              </li>
+            );
+          })}
         </ul>
-        <p className="text-[13px] text-muted">Each link opens that platform&apos;s own page for this route and day. Log in on their site (we never see your password), find {chosen ? `${chosen.facts.flightNo} at about ${inr(chosen.totalInr)}` : "your flight"}, and pay there. Safar Saathi cannot book or take payment on them.</p>
+        <p className="text-[13px] text-muted">Each link opens that platform&apos;s own page for this route and day. Log in on their site (we never see your password), find {chosen ? `${chosen.facts.flightNo}` : "your flight"}, and pay there. Safar Saathi cannot book or take payment on them.</p>
       </div>
 
       {chosen && (

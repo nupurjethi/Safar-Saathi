@@ -4,13 +4,16 @@ import { useState } from "react";
 import { Badge, Button } from "@/components/ui/primitives";
 import { inr } from "@/lib/time";
 import type { Review } from "./ReviewCard";
+import { useSelectedPlatform } from "./platform-choice";
 
 export type HotelsPart = {
   t: "hotels"; bookingRef: string; itemId: string; configured: boolean;
+  /** true: sample prices from the Safar Saathi mock partner API (not live). */
+  sample?: boolean;
   current: { name: string; city: string; address: string; checkin: string; checkout: string; rooms: number; lat: number; lon: number };
   query: { checkin: string; checkout: string; nights: number; rooms: number; adults: number; city: string };
   providers: { name: string; ok: boolean; count: number; error?: string }[];
-  offers: { id: string; providerLabel: string; source: string; hotelName: string; address?: string; lat?: number; lon?: number; roomType?: string; totalInr: number; perNightInr: number; breakup: { label: string; amountInr: number }[]; refundable: boolean; cancellation?: string; validUntil: string }[];
+  offers: { id: string; providerLabel: string; source: string; hotelName: string; address?: string; lat?: number; lon?: number; roomType?: string; totalInr: number; perNightInr: number; breakup: { label: string; amountInr: number }[]; refundable: boolean; cancellation?: string; validUntil: string; platformPrices?: { platform: string; name: string; totalInr: number; url: string }[] }[];
   cheapestId?: string;
   platforms: { id: string; name: string; hotelsUrl: string; connected: boolean }[];
 };
@@ -27,6 +30,9 @@ const addDays = (d: string, n: number) => { const x = new Date(`${d}T00:00:00Z`)
 export function HotelCard({ part, online, onReview }: { part: HotelsPart; online: boolean; onReview: (card: Review) => void }) {
   const [pick, setPick] = useState<string | undefined>(part.configured ? part.cheapestId ?? part.offers[0]?.id : undefined);
   const chosen = part.offers.find((o) => o.id === pick);
+  const selected = useSelectedPlatform();
+  const selPlatform = part.platforms.find((p) => p.id === selected);
+  const selPrice = chosen?.platformPrices?.find((p) => p.platform === selected);
   const [mode, setMode] = useState<"extend" | "replace">("extend");
   const [platform, setPlatform] = useState(part.platforms.find((p) => p.connected)?.id ?? part.platforms[0].id);
   const [checkout, setCheckout] = useState(part.query.checkout > part.current.checkout ? part.query.checkout : addDays(part.current.checkout, 1));
@@ -68,7 +74,7 @@ export function HotelCard({ part, online, onReview }: { part: HotelsPart; online
     <section aria-label="Change your hotel stay" data-testid="hotels-card" className="card-2 space-y-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[20px] font-semibold">Change your stay</h3>
-        <Badge tone={part.configured ? "ok" : "warn"}>{part.configured ? "Live prices" : "You pay on their site"}</Badge>
+        <Badge tone={part.configured && !part.sample ? "ok" : "warn"}>{part.sample ? "Sample prices" : part.configured ? "Live prices" : "You pay on their site"}</Badge>
       </div>
 
       <div className="rounded-xl border-[1.5px] border-line bg-surface p-3" data-testid="hotel-current">
@@ -102,7 +108,7 @@ export function HotelCard({ part, online, onReview }: { part: HotelsPart; online
               </li>
             ))}
           </ul>
-          <p className="text-[13px] text-muted">Reference prices from official hotel price APIs. MakeMyTrip, Goibibo, Cleartrip and ixigo can show a different price for the same hotel, so check it there before you pay.</p>
+          <p className="text-[13px] text-muted" data-testid="hotel-source">{part.sample ? "Sample prices from the Safar Saathi mock partner API, not live prices. The per-platform prices are samples too: check the real price on the platform before you pay." : "Reference prices from official hotel price APIs. MakeMyTrip, Goibibo, Cleartrip and ixigo can show a different price for the same hotel, so check it there before you pay."}</p>
         </div>
       ) : (
         <p className="rounded-xl border border-warn p-3 text-[15px]" data-testid="hotel-no-source">
@@ -111,15 +117,24 @@ export function HotelCard({ part, online, onReview }: { part: HotelsPart; online
       )}
 
       <div className="space-y-2">
-        <p className="text-[15px] font-semibold">Book it where you like, and pay there</p>
+        {selPlatform ? (
+          <a href={selPrice?.url ?? selPlatform.hotelsUrl} target="_blank" rel="noopener noreferrer" data-testid="pay-on-platform" className="flex min-h-12 items-center justify-center gap-2 rounded-full bg-lime px-4 text-center text-[16px] font-bold text-lime-ink">
+            Pay on {selPlatform.name}{selPrice ? ` · ${inr(selPrice.totalInr)}${part.sample ? " (sample)" : ""}` : ""} <ExternalLink size={16} />
+          </a>
+        ) : <p className="rounded-xl border border-warn p-3 text-[15px]" data-testid="pay-choose-platform">Choose the platform you are logged in to at the top of the chat, and I will open it for you to book and pay.</p>}
+        <p className="text-[15px] font-semibold">{chosen?.platformPrices ? "Sample price on each platform" : "Book it where you like, and pay there"}</p>
         <ul className="grid gap-2 sm:grid-cols-2" data-testid="hotel-platforms">
-          {part.platforms.map((p) => (
-            <li key={p.id}>
-              <a href={p.hotelsUrl} target="_blank" rel="noopener noreferrer" data-testid="hotel-platform-open" className="flex min-h-12 items-center justify-between gap-2 rounded-xl border-[1.5px] border-line bg-surface px-3 text-[16px] font-semibold hover:border-muted">
-                <span>{p.name}{p.connected ? <span className="ml-2 text-[13px] font-normal text-ok">logged in</span> : null}</span><ExternalLink size={16} />
-              </a>
-            </li>
-          ))}
+          {part.platforms.map((p) => {
+            const price = chosen?.platformPrices?.find((x) => x.platform === p.id);
+            return (
+              <li key={p.id}>
+                <a href={price?.url ?? p.hotelsUrl} target="_blank" rel="noopener noreferrer" data-testid="hotel-platform-open" className={`flex min-h-12 items-center justify-between gap-2 rounded-xl border-[1.5px] bg-surface px-3 text-[16px] font-semibold hover:border-muted ${p.id === selected ? "border-lime" : "border-line"}`}>
+                  <span>{p.name}{p.id === selected ? <span className="ml-2 text-[13px] font-normal text-ok">logged in</span> : null}</span>
+                  <span className="inline-flex items-center gap-2">{price ? inr(price.totalInr) : null}<ExternalLink size={16} /></span>
+                </a>
+              </li>
+            );
+          })}
         </ul>
         <div className="rounded-xl border-[1.5px] border-line bg-surface p-3" data-testid="hotel-details">
           <p className="text-[13px] text-muted">Details to enter on the platform</p>

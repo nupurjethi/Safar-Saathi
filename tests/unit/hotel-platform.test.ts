@@ -53,17 +53,21 @@ describe("hotel price source (Amadeus, official API, mocked)", () => {
 describe("compare_hotels agent tool", () => {
   const events: UiEvent[] = [];
   const mk = (): ToolCtx => ({ userId: c.neha.id, bookingRef: c.booking.ref, bookingId: c.booking.id, threadId: null, channel: "app", now: new Date(), ui: (e) => events.push(e) });
-  it("with no price source: says so, shows the details to enter, never prices", async () => {
+  it("with no live price API: SAMPLE hotel prices from the mock partner API, after check-out, priced on all four platforms", async () => {
     events.length = 0;
-    const out = (await runTool("compare_hotels", { extraNights: 2 }, mk())) as { configured: boolean; next: string };
-    expect(out.configured).toBe(false);
-    expect(out.next).toMatch(/CANNOT compare prices/);
+    const out = (await runTool("compare_hotels", { extraNights: 2 }, mk())) as { configured: boolean; sample: boolean; next: string };
+    expect(out.configured).toBe(true);
+    expect(out.sample).toBe(true);
+    expect(out.next).toMatch(/SAMPLE hotel prices/);
     const h = events.find((e) => e.t === "hotels") as Extract<UiEvent, { t: "hotels" }>;
+    expect(h.sample).toBe(true);
     expect(h.query.nights).toBe(2);
     expect(h.query.checkin).toBe(h.current.checkout);
     expect(h.query.checkout).toBe(addDays(h.current.checkout, 2));
-    expect(h.offers).toEqual([]);
+    expect(h.offers.length).toBeGreaterThan(0);
+    for (const o of h.offers) { expect(o.source).toMatch(/not live prices/); expect(o.platformPrices!.length).toBe(4); expect(o.lat).toBeTypeOf("number"); }
   });
+
   it("with a configured price source it shows ranked live offers for the dates after check-out", async () => {
     process.env.AMADEUS_API_KEY = "k"; process.env.AMADEUS_API_SECRET = "s";
     const seen: string[] = [];
@@ -80,6 +84,7 @@ describe("compare_hotels agent tool", () => {
     await runTool("compare_hotels", { extraNights: 1 }, mk());
     const h = events.find((e) => e.t === "hotels") as Extract<UiEvent, { t: "hotels" }>;
     expect(h.configured).toBe(true);
+    expect(h.sample).toBe(false);
     expect(h.offers.map((o) => o.hotelName)).toEqual(["Cheap", "Pricey"]);
     expect(h.cheapestId).toBe("amadeus:O2");
     expect(seen.some((u) => u.includes("hotelIds=H1%2CH2") && u.includes("currency=INR"))).toBe(true);

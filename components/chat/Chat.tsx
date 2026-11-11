@@ -6,9 +6,9 @@ import { Badge, Button, LinkButton } from "@/components/ui/primitives";
 import { TripGate } from "@/components/trip/TripGate";
 import { useTrip } from "@/components/trip/TripProvider";
 import { enqueue, pending, remove } from "@/lib/offline/outbox";
-import { answerOffline, QUICK_QUESTIONS, type OaAnswer } from "@/lib/offline/assistant";
 import { inr } from "@/lib/time";
-import { OfflineAnswer } from "./OfflineAnswer";
+import { ChatTabs } from "./ChatTabs";
+import { PlatformSelector } from "./PlatformSelector";
 import { ReviewCardView, type Review, type ReviewState } from "./ReviewCard";
 import { PlatformCard, type PlatformsPart } from "./PlatformCard";
 import { CompareCard, type ComparePart } from "./CompareCard";
@@ -24,8 +24,8 @@ type Part =
   | PlatformsPart
   | ComparePart
   | HotelsPart
-  | { t: "oa"; answer: OaAnswer; question: string; userId: string; queued?: boolean };
-type Msg = { id: string; role: "user" | "assistant"; text: string; steps: Step[]; parts: Part[]; queued?: boolean; label?: string; ms?: number };
+;
+type Msg = { id: string; role: "user" | "assistant"; text: string; steps: Step[]; parts: Part[]; queued?: boolean; label?: string; ms?: number; offlineLink?: boolean };
 
 const DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
 const PROMPTS = ["When is my pickup?", "Change my flight", "Change my hotel stay", "How do I get from my hotel to the Colosseum?"];
@@ -44,10 +44,7 @@ export function Chat() {
   const [loaded, setLoaded] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const online = trip.net === "online";
-  // The offline assistant answers when there is no data, when the traveller switches it on, or when the online agent cannot be reached.
-  const [forceOffline, setForceOffline] = useState(false);
-  const offlineMode = !online || forceOffline;
-  const pack = trip.pack;
+  // The offline assistant is a separate chat (/trips/{ref}/offline). This chat only talks to the online Trip agent.
 
   // restore history when online
   useEffect(() => {
@@ -67,14 +64,6 @@ export function Chat() {
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [msgs]);
 
-  /** Replaces the (empty or failed) assistant bubble with an answer from the saved bundle. Returns false if there is no bundle. */
-  const localFallback = useCallback((assistantId: string, text: string, userId: string, note?: string) => {
-    if (!pack) return false;
-    const answer = answerOffline(pack, text, { now: new Date() });
-    setMsgs((all) => all.map((x) => (x.id === assistantId && !x.text ? { ...x, text: note ?? "The online agent could not be reached, so I answered from the guide saved on your phone.", steps: [], parts: [{ t: "oa", answer, question: text, userId }], label: "Offline assistant" } : x)));
-    return true;
-  }, [pack]);
-
   const stream = useCallback(async (text: string, userMsgId?: string) => {
     const aId = nid();
     const uId = userMsgId ?? nid();
@@ -85,8 +74,8 @@ export function Chat() {
       const res = await fetch("/api/agent", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bookingRef: ref, message: text, threadId, chaos: chaos ? "price_move" : undefined }) });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
-        if (res.status !== 401 && res.status !== 429 && localFallback(aId, text, uId)) return; // the online agent failed: answer from the saved bundle
-        patch((m) => ({ ...m, text: res.status === 401 ? "Please sign in again." : (j.message ?? "I could not answer just now.") }));
+        // the online agent failed: say so, and point to the separate offline assistant (it answers from the saved trip)
+        patch((m) => ({ ...m, text: res.status === 401 ? "Please sign in again." : (j.message ?? "The Trip agent could not answer just now."), offlineLink: res.status !== 401 }));
         return;
       }
       const reader = res.body.getReader();
@@ -112,35 +101,25 @@ export function Chat() {
         }
       }
     } catch {
-      if (!localFallback(aId, text, uId)) patch((m) => ({ ...m, text: m.text || "I lost the connection. Your message is safe. Try again when you have data." }));
+      patch((m) => ({ ...m, text: m.text || "I lost the connection. Try again when you have data.", offlineLink: true }));
     } finally {
       setBusy(false);
     }
-  }, [ref, threadId, chaos, localFallback]);
+  }, [ref, threadId, chaos]);
 
   const send = useCallback(async (text: string) => {
     const t = text.trim();
     if (!t || busy) return;
     setInput("");
-    if (offlineMode) {
+    if (!online) {
+      // No internet: keep the question and ask the Trip agent automatically when the phone is back online.
       const userId = nid();
-      if (!pack) {
-        setMsgs((m) => [...m, { id: userId, role: "user", text: t, steps: [], parts: [] }, { id: nid(), role: "assistant", text: "This trip is not saved on this phone yet, so I cannot answer offline. Open it once with data.", steps: [], parts: [] }]);
-        return;
-      }
-      const answer = answerOffline(pack, t, { now: new Date() });
-      setMsgs((m) => [...m, { id: userId, role: "user", text: t, steps: [], parts: [] }, { id: nid(), role: "assistant", text: "", steps: [], parts: [{ t: "oa", answer, question: t, userId }], label: "Answered on this phone, no network used" }]);
+      await enqueue({ ref, kind: "chat", payload: { text: t, localId: userId } }).catch(() => {});
+      setMsgs((m) => [...m, { id: userId, role: "user", text: t, steps: [], parts: [], queued: true }, { id: nid(), role: "assistant", text: "Saved. I will ask the Trip agent as soon as you are online. For answers right now, use the offline assistant.", steps: [], parts: [], offlineLink: true }]);
       return;
     }
     void stream(t);
-  }, [busy, offlineMode, pack, stream]);
-
-  /** Queue a question for the online Trip agent (sent when there is data). The offline assistant never changes anything. */
-  const queueForAgent = useCallback(async (assistantMsgId: string, p: { question: string; userId: string }) => {
-    if (online) { void stream(p.question, p.userId); return; }
-    await enqueue({ ref, kind: "chat", payload: { text: p.question, localId: p.userId } }).catch(() => {});
-    setMsgs((all) => all.map((x) => (x.id === assistantMsgId ? { ...x, parts: x.parts.map((q) => (q.t === "oa" ? { ...q, queued: true } : q)) } : x)));
-  }, [ref, online, stream]);
+  }, [busy, online, ref, stream]);
 
   // flush the outbox when we get back online
   useEffect(() => {
@@ -203,19 +182,21 @@ export function Chat() {
         <Link href={`/trips/${ref}/log`} className="inline-flex min-h-11 items-center text-[15px] text-accent underline">See action log</Link>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => setForceOffline((v) => !v)} aria-pressed={offlineMode} disabled={!online} data-testid="offline-assistant" className={`inline-flex min-h-11 items-center gap-2 rounded-full border-[1.5px] px-4 text-[15px] font-semibold ${offlineMode ? "border-lime bg-lime text-lime-ink" : "border-line bg-surface"} disabled:opacity-100`}>
-          <CloudOff size={16} /> Offline assistant{offlineMode ? ": on" : ""}
-        </button>
-        <span className="text-[13px] text-muted">{!online ? "No data, so this is answering from the guide saved on your phone." : forceOffline ? "Answers come from your saved bundle. No network, no AI model." : "Switch on to answer from your saved bundle with no network."}</span>
-      </div>
-      {!online && <p role="status" className="rounded-xl border border-warn p-3 text-warn">You are offline. The online Trip agent needs data. The offline assistant answers from your saved booking and guides, and cannot change anything. Questions it cannot answer can be queued for the agent.</p>}
+      <ChatTabs refCode={ref} active="online" />
+      <PlatformSelector bookingRef={ref} />
+      {!online && (
+        <div role="status" data-testid="online-offline-banner" className="space-y-3 rounded-xl border-[1.5px] border-warn p-3">
+          <p className="flex items-center gap-2 font-semibold text-warn"><CloudOff size={18} /> You are offline. The Trip agent needs internet.</p>
+          <p className="text-[15px]">Messages you send here are saved and asked when you are back online. For answers now, the offline assistant reads the trip saved on this phone.</p>
+          <LinkButton href={`/trips/${ref}/offline`} variant="primary" size="md" data-testid="open-offline-assistant">Open the offline assistant</LinkButton>
+        </div>
+      )}
 
       <div className="flex flex-1 flex-col gap-4" aria-live="polite" aria-relevant="additions text" data-testid="chat-log">
         {!msgs.length && (
           <div className="space-y-3">
-            <p className="text-muted">{offlineMode ? "Ask about your trip. I answer from the booking and guides saved on this phone. I cannot change anything." : "Ask about your trip. I only answer from your booking. Changes always need your Confirm tap."}</p>
-            <div className="flex flex-wrap gap-2">{(offlineMode ? QUICK_QUESTIONS : PROMPTS).map((p) => <button key={p} onClick={() => void send(p)} data-testid={offlineMode ? "oa-chip" : undefined} className="min-h-11 rounded-full border-[1.5px] border-line bg-surface px-4 text-left text-[15px] hover:border-muted">{p}</button>)}</div>
+            <p className="text-muted">Ask about your trip. I only answer from your booking. Changes always need your Confirm tap.</p>
+            <div className="flex flex-wrap gap-2">{PROMPTS.map((p) => <button key={p} onClick={() => void send(p)} className="min-h-11 rounded-full border-[1.5px] border-line bg-surface px-4 text-left text-[15px] hover:border-muted">{p}</button>)}</div>
           </div>
         )}
         {msgs.map((m) => (
@@ -227,9 +208,8 @@ export function Chat() {
                 {m.steps.length > 0 && <div className="flex flex-wrap gap-1.5" aria-label="Steps the agent took">{m.steps.map((s) => <StepChip key={s.id} s={s} />)}</div>}
                 {m.text ? <div className="card-2 whitespace-pre-wrap px-4 py-3" data-testid="assistant-text">{m.text}</div> : (!m.parts.length && <div className="typing card-2 inline-block px-4 py-3" aria-label="Agent is typing"><span /><span /><span /></div>)}
                 {m.parts.some((p) => p.t === "review") && m.parts.filter((p) => p.t === "review").length > 1 && <p className="text-[15px] font-semibold" data-testid="options-heading">Choose an option ({m.parts.filter((p) => p.t === "review").length}). Compare the breakups, then tap Yes on one or No.</p>}
-                {m.parts.map((p, i) => p.t === "oa" && pack
-                  ? <OfflineAnswer key={i} answer={p.answer} pack={pack} now={trip.now} online={online} queued={p.queued} onAsk={(q) => void send(q)} onQueue={() => void queueForAgent(m.id, p)} />
-                  : <PartView key={i} p={p} states={states} onConfirm={confirm} onDecline={decline} refCode={ref} online={online} onReview={addReview} onRecord={recordFromCompare} />)}
+                {m.offlineLink && <LinkButton href={`/trips/${ref}/offline`} size="md" data-testid="ask-offline-assistant"><CloudOff size={16} /> Ask the offline assistant</LinkButton>}
+                {m.parts.map((p, i) => <PartView key={i} p={p} states={states} onConfirm={confirm} onDecline={decline} refCode={ref} online={online} onReview={addReview} onRecord={recordFromCompare} />)}
                 {m.label && <p className="text-[13px] text-muted">{m.label}{m.ms ? ` · ${(m.ms / 1000).toFixed(1)} s` : ""}</p>}
               </div>
             )}
@@ -240,7 +220,7 @@ export function Chat() {
 
       <form onSubmit={(e) => { e.preventDefault(); void send(input); }} className="sticky bottom-20 flex gap-2 rounded-2xl bg-bg/95 pb-2 pt-2 sm:bottom-4">
         <label htmlFor="chat-input" className="sr-only">Message the trip agent</label>
-        <input id="chat-input" value={input} onChange={(e) => setInput(e.target.value)} maxLength={800} placeholder={offlineMode ? "Ask the offline assistant…" : "Ask about your trip…"} className="min-h-12 flex-1 rounded-xl border-[1.5px] border-line bg-surface px-4 text-[17px] placeholder:text-muted" autoComplete="off" />
+        <input id="chat-input" value={input} onChange={(e) => setInput(e.target.value)} maxLength={800} placeholder={online ? "Ask about your trip…" : "Saved and asked when you are online…"} className="min-h-12 flex-1 rounded-xl border-[1.5px] border-line bg-surface px-4 text-[17px] placeholder:text-muted" autoComplete="off" />
         <Button type="submit" variant="primary" disabled={busy || !input.trim()} aria-label="Send">{busy ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}</Button>
       </form>
       {DEMO && (
@@ -275,7 +255,6 @@ function PartView({ p, states, onConfirm, onDecline, refCode, online, onReview, 
   if (p.t === "hotels") return <HotelCard part={p} online={online} onReview={onReview} />;
   if (p.t === "compare") return <CompareCard part={p} online={online} onRecord={onRecord} />;
   if (p.t === "platforms") return <PlatformCard part={p} online={online} onReview={onReview} />;
-  if (p.t === "oa") return null; // rendered by Chat itself (needs the saved pack)
   if (p.t === "case") {
     return (
       <section data-testid="case-card" className={`card space-y-1 p-4 ${p.severity === 1 ? "border-danger" : "border-warn"}`}>

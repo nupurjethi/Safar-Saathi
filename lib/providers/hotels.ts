@@ -1,3 +1,5 @@
+import { mockHotelOffers, SAMPLE_PROVIDER, type PlatformPrice } from "./partners";
+import type { Db } from "@/lib/db/client";
 /**
  * Live hotel prices from an OFFICIAL API: Amadeus for Developers (Hotel List by geocode + Hotel Search offers). Same keys as the
  * flight search (AMADEUS_API_KEY / AMADEUS_API_SECRET / AMADEUS_ENV). Search only: the traveller books and pays on their own
@@ -21,8 +23,10 @@ async function accessToken(): Promise<string> {
 
 export type HotelQuery = { lat: number; lon: number; checkin: string; checkout: string; rooms: number; adults: number };
 export type HotelOffer = {
-  id: string; provider: "amadeus"; providerLabel: string; source: string; hotelName: string; address?: string; lat?: number; lon?: number; roomType?: string;
+  id: string; provider: "amadeus" | "mock"; providerLabel: string; source: string; hotelName: string; address?: string; lat?: number; lon?: number; roomType?: string;
   totalInr: number; perNightInr: number; breakup: { label: string; amountInr: number }[]; refundable: boolean; cancellation?: string; validUntil: string;
+  /** Sample per-platform prices (mock partner API only). */
+  platformPrices?: PlatformPrice[];
 };
 
 type AmadeusHotelOffers = {
@@ -71,7 +75,7 @@ export async function searchHotels(q: HotelQuery): Promise<HotelOffer[]> {
   return mapAmadeusHotels((await res.json()) as AmadeusHotelOffers, q, Number(process.env.FX_TO_INR ?? 1));
 }
 
-export type HotelCompare = { configured: boolean; providers: { name: string; ok: boolean; count: number; error?: string }[]; offers: HotelOffer[]; cheapestId?: string };
+export type HotelCompare = { configured: boolean; sample?: boolean; providers: { name: string; ok: boolean; count: number; error?: string }[]; offers: HotelOffer[]; cheapestId?: string };
 export async function compareHotels(q: HotelQuery, search: (q: HotelQuery) => Promise<HotelOffer[]> = searchHotels, enabled: () => boolean = hotelPriceSourceEnabled): Promise<HotelCompare> {
   if (!enabled()) return { configured: false, providers: [], offers: [] };
   try {
@@ -79,5 +83,18 @@ export async function compareHotels(q: HotelQuery, search: (q: HotelQuery) => Pr
     return { configured: true, providers: [{ name: "Amadeus", ok: true, count: offers.length }], offers, cheapestId: offers[0]?.id };
   } catch (e) {
     return { configured: true, providers: [{ name: "Amadeus", ok: false, count: 0, error: e instanceof Error ? e.message : String(e) }], offers: [] };
+  }
+}
+
+/** What the agent uses: the live official API when keys are set, otherwise the Safar Saathi mock partner API (sample, labelled). */
+export async function compareHotelsOrSample(q: HotelQuery & { cityName: string; citySlug?: string }, opts: { db?: Db } = {}): Promise<HotelCompare> {
+  const live = await compareHotels(q);
+  if (live.configured) return { ...live, sample: false };
+  try {
+    const { offers } = await mockHotelOffers(q, opts.db);
+    const top = offers.slice(0, 6);
+    return { configured: true, sample: true, providers: [{ name: SAMPLE_PROVIDER, ok: true, count: offers.length }], offers: top, cheapestId: top[0]?.id };
+  } catch (e) {
+    return { configured: true, sample: true, providers: [{ name: SAMPLE_PROVIDER, ok: false, count: 0, error: e instanceof Error ? e.message : String(e) }], offers: [] };
   }
 }

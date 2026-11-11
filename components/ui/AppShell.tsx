@@ -1,5 +1,5 @@
 "use client";
-import { Compass, LogOut, Luggage, Moon, Shield, Sun } from "lucide-react";
+import { Compass, FilePlus2, LogOut, Luggage, Moon, Shield, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -62,6 +62,7 @@ export function AppShell({ children, signedIn = false }: { children: React.React
           <nav aria-label="Primary" className="ml-4 hidden items-center gap-6 text-[14px] font-medium sm:flex [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center">
             <Link href={tripsHref} className={path === "/" || path.startsWith("/explore") || path.startsWith("/itinerary") ? "text-accent" : "text-ink hover:text-accent"}>Trips</Link>
             <Link href="/trips" className={path.startsWith("/trips") ? "text-accent" : "text-ink hover:text-accent"}>My trips</Link>
+            {me && me.role === "traveller" && <Link href="/plans/new" className={path.startsWith("/plans") ? "text-accent" : "text-ink hover:text-accent"}>Add travel plan</Link>}
             {staff && <Link href="/agent" className={path.startsWith("/agent") ? "text-accent" : "text-ink hover:text-accent"}>Agent desk</Link>}
             {staff && <Link href="/admin/cases" className={path.startsWith("/admin") ? "text-accent" : "text-ink hover:text-accent"}>Admin</Link>}
           </nav>
@@ -86,6 +87,7 @@ export function AppShell({ children, signedIn = false }: { children: React.React
           <ul className="mx-auto flex max-w-md items-stretch justify-around sm:hidden">
             <NavItem href={tripsHref} icon={<Compass size={22} strokeWidth={1.75} />} label="Trips" active={path === "/" || path.startsWith("/explore") || path.startsWith("/itinerary")} />
             <NavItem href="/trips" icon={<Luggage size={22} strokeWidth={1.75} />} label="My Trips" active={path.startsWith("/trips")} />
+            {me && me.role === "traveller" && <NavItem href="/plans/new" icon={<FilePlus2 size={22} strokeWidth={1.75} />} label="Add plan" active={path.startsWith("/plans")} />}
             {staff && <NavItem href="/agent" icon={<Shield size={22} strokeWidth={1.75} />} label="Agent desk" active={path.startsWith("/agent") || path.startsWith("/admin")} />}
           </ul>
         </nav>

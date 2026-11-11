@@ -81,7 +81,14 @@ const flightCard = (title: string, f: { flightNo: string; carrierName: string; f
   ],
 });
 
-async function tzMap(db: Db, itineraryId: string) {
+async function tzMap(db: Db, booking: typeof s.bookings.$inferSelect) {
+  if (!booking.itineraryId) {
+    // uploaded travel plan: the time zones come from the plan's own cities and airports (lib/plans)
+    const [plan] = booking.planId ? await db.select().from(s.travelPlans).where(eq(s.travelPlans.id, booking.planId)) : [];
+    const tz = (plan?.extracted as { airportTz?: Record<string, string> } | undefined)?.airportTz ?? {};
+    return new Map<string, string>(Object.entries(tz));
+  }
+  const itineraryId = booking.itineraryId;
   const [it] = await db.select().from(s.itineraries).where(eq(s.itineraries.id, itineraryId));
   const ds = await db.select().from(s.destinations).where(inArray(s.destinations.slug, it.cities));
   return new Map<string, string>(ds.map((d) => [d.airportIata, d.timezone]));
@@ -90,7 +97,7 @@ async function tzMap(db: Db, itineraryId: string) {
 /** Pure(ish) price + availability computation. Used for quoting AND re-checking at apply time. */
 export async function computeChange(db: Db, booking: typeof s.bookings.$inferSelect, kind: ChangeKind, params: Params): Promise<Computed> {
   const bump = 1 + Number(params.bumpPct ?? 0) / 100;
-  const tzs = await tzMap(db, booking.itineraryId);
+  const tzs = await tzMap(db, booking);
   const items = await db.select().from(s.bookingItems).where(and(eq(s.bookingItems.bookingId, booking.id), eq(s.bookingItems.status, "confirmed")));
 
   if (kind === "flight_change") {

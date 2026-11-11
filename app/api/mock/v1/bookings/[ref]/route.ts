@@ -12,6 +12,7 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ ref: st
   const b = await bookingForSession(ref, sess);
   const db = await getDb();
   const items = await db.select().from(s.bookingItems).where(and(eq(s.bookingItems.bookingId, b.id), eq(s.bookingItems.status, "confirmed")));
-  const [it] = await db.select().from(s.itineraries).where(eq(s.itineraries.id, b.itineraryId));
-  return json({ booking: { ...b, title: it.title }, items, notice: "Sample data." });
+  const [it] = b.itineraryId ? await db.select().from(s.itineraries).where(eq(s.itineraries.id, b.itineraryId)) : [];
+  const [plan] = !it && b.planId ? await db.select({ title: s.travelPlans.title }).from(s.travelPlans).where(eq(s.travelPlans.id, b.planId)) : [];
+  return json({ booking: { ...b, title: it?.title ?? plan?.title ?? "Travel plan" }, items, notice: "Sample data." });
 });

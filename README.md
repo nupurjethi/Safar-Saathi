@@ -86,6 +86,26 @@ Limits, said plainly: no live traffic or transit times, no address search offlin
 
 `/` depends on who is looking: **not signed in** = the "How it works" scroll story with **Travel user login** and **Agent login** (header, hero and closing buttons); **travel user** = Home (the trip catalogue); **agent** = straight to `/agent`. The full story is always at `/story`, the public catalogue at `/explore`. The root layout reads the session so the story can bring its own header (`AppShell` `signedIn`).
 
+### Add travel plan (the main agent)
+
+Signed-in travellers tap **Add travel plan** (home, My trips, nav) and upload their existing bookings: PDF, Word (.docx), Excel (.xlsx), CSV, photos or screenshots, email or text, up to 12 files of 4 MB each (one request per file, so it also works on a serverless host). `lib/plans/parse.ts` reads each file (text via `unpdf`, `mammoth`, `exceljs`; images go to the model as images). Then `lib/plans/process.ts`:
+
+1. **Gemini reads everything** in one call (`lib/plans/extract.ts`, via OpenRouter; model `LLM_MODEL`) into a validated plan (`lib/plans/schema.ts`): travellers, cities with time zones, flights (local times, IATA, PNR), hotels, activities, transfers, phone numbers. Anything not in the documents is left out, never guessed; one retry with the validation errors.
+2. **Finds every place on the map** (`lib/plans/geo.ts`): our own seeded airports, cities and landmarks first, then OpenStreetMap search via the public Photon geocoder (one request per second). Not found = no pin, with a warning.
+3. **Offline street map**: cities we already cover reuse the pre-built tiles; any other city gets a PMTiles file built right then from the public Protomaps OpenStreetMap build (`lib/map/extract-tiles.ts`, range requests, zoom 0-14, a few MB) and stored in Neon (`map_tiles`, served by `/api/tiles/<key>.pmtiles`).
+4. **Creates the trip** (a booking with `source = "upload"`, flight and hotel items) and builds the **same offline bundle** as catalogue trips (`lib/plans/pack.ts`): day plan, map pins, real road/foot routes (OSM routing at build time), the six validated help guides, SOS numbers, the offline assistant, the agent and the Confirm gate.
+5. **Deletes the documents' text and images**; only the structured plan is kept. Warnings ("no hotel phone", "a place was not found") are shown before opening the trip.
+
+About a minute per plan (Goa test: Gemini 13-35 s, places 10 s, map 40 s). Without `LLM_API_KEY` it says plainly that documents cannot be read yet.
+
+### Mock partner fares (sample data in Neon) and "I'm logged in to"
+
+Instead of external price APIs, the agent's flight and hotel comparisons read **mock data stored in Neon** (`lib/providers/partners.ts`): the seeded `flights` and `room_inventory`, plus flights and hotels generated deterministically and stored the first time a new route or city is asked for (`mock_hotels`), priced per platform with `partner_markups`. Every price is labelled "Sample fares from the Safar Saathi mock partner API, not live prices". At the top of the chat the traveller picks **I'm logged in to: MakeMyTrip / Goibibo / Cleartrip / ixigo**; each comparison then shows **Pay on <that platform>**, which opens that site to complete the payment there, then they record the booking and Confirm. Official APIs (Amadeus, Duffel) are still used instead when their keys are set.
+
+### Offline assistant is a separate chat
+
+`/trips/<ref>/offline` is its own chat (history kept on the phone), separate from the online Trip agent at `/trips/<ref>/chat`; tabs at the top switch between them. The online chat no longer answers from the offline bundle: when the phone is offline it says so and links to the offline assistant.
+
 ### Changing a flight: your own booking platform, then Confirm
 
 Flight changes no longer use sample inventory. Ask the agent to move, reschedule, rebook or cancel a flight and it shows a **platform card** (`components/chat/PlatformCard.tsx`): your booked flight, then **MakeMyTrip, Goibibo, Cleartrip and ixigo** buttons that open each platform's own flight page (same route and day) or "my trips" page in a new tab. You log in there yourself and change the ticket. Back in the app you enter the new flight (airline, number, times, PNR, fare difference and change fee you paid), which creates a **review card**; only your Yes tap updates the trip, the totals and the offline guide (`flight_external` in `lib/gate/changes.ts`, no price limit because we charge nothing, recorded as an `external` payment).

@@ -62,6 +62,7 @@ export async function buildPackContent(bookingId: string, dbIn?: Db): Promise<Ba
   const db = dbIn ?? (await getDb());
   const [b] = await db.select().from(s.bookings).where(eq(s.bookings.id, bookingId)).limit(1);
   if (!b) throw new Error("BOOKING_NOT_FOUND");
+  if (!b.itineraryId) return (await import("@/lib/plans/pack")).buildPlanPackContent(b, db); // uploaded travel plan
   const [itin] = await db.select().from(s.itineraries).where(eq(s.itineraries.id, b.itineraryId)).limit(1);
   const items = (await db.select().from(s.bookingItems).where(and(eq(s.bookingItems.bookingId, b.id), eq(s.bookingItems.status, "confirmed")))).sort(
     (x, y) => x.date.localeCompare(y.date),
@@ -234,7 +235,7 @@ export function buildManifest(pack: OfflinePack, bookingId: string, packBytes: n
     files.push({ url: f.url, kind: "map-asset", bytes: buf.length, hash: sha256(buf) });
   }
   const ref = pack.booking.ref;
-  for (const p of ["", "/chat", "/guide", "/map", "/sos", "/log"]) files.push({ url: `/trips/${ref}${p}`, kind: "page", bytes: 0 });
+  for (const p of ["", "/chat", "/offline", "/guide", "/map", "/sos", "/log"]) files.push({ url: `/trips/${ref}${p}`, kind: "page", bytes: 0 });
   files.push({ url: "/offline", kind: "page", bytes: 0 });
   const totalBytes = files.reduce((a, f) => a + f.bytes, 0);
   return { bookingRef: ref, packVersion: pack.packVersion, contentHash: pack.contentHash, builtAt: pack.builtAt, totalBytes, budgetBytes: PACK_BUDGET_BYTES, overBudget: totalBytes > PACK_BUDGET_BYTES, files };

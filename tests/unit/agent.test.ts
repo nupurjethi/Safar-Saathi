@@ -99,16 +99,23 @@ describe("demo agent (STUB used when no LLM key is set)", () => {
     expect(t).toMatch(/code SS\d{4}/);
   });
 
-  it("flight change: sends the traveller to their own booking platform (picker), no sample flights, no review card, never says it is done", async () => {
+  it("flight change: compares SAMPLE fares from the mock partner API (labelled), per platform, no review card, never says it is done", async () => {
     events.length = 0;
     const t = await demoAgent("Please move my Paris to Rome flight later", mk(), emit);
     expect(events.some((e) => e.t === "review")).toBe(false);
-    const pf = events.find((e) => e.t === "platforms") as Extract<UiEvent, { t: "platforms" }>;
-    expect(pf).toBeTruthy();
-    expect(pf.platforms.map((p) => p.name)).toEqual(["MakeMyTrip", "Goibibo", "Cleartrip", "ixigo"]);
-    for (const p of pf.platforms) expect(p.searchUrl).toMatch(/^https:\/\//);
+    const cmp = events.find((e) => e.t === "compare") as Extract<UiEvent, { t: "compare" }>;
+    expect(cmp).toBeTruthy();
+    expect(cmp.sample).toBe(true);
+    expect(cmp.offers.length).toBeGreaterThan(0);
+    for (const o of cmp.offers) {
+      expect(o.source).toMatch(/Sample fares from the Safar Saathi mock partner API, not live prices/);
+      expect(o.platformPrices!.map((p) => p.platform).sort()).toEqual(["cleartrip", "goibibo", "ixigo", "makemytrip"]);
+    }
+    expect(cmp.platforms.map((p) => p.name)).toEqual(["MakeMyTrip", "Goibibo", "Cleartrip", "ixigo"]);
+    for (const p of cmp.platforms) expect(p.searchUrl).toMatch(/^https:\/\//);
+    expect(t).toMatch(/sample fares/i);
+    expect(t).toMatch(/not live prices/);
     expect(t).toMatch(/cannot log in there for you/);
-    expect(t).toMatch(/do not have a live price feed/); // no price API configured: it says so instead of inventing prices
     expect(t).toMatch(/never see your password/);
     expect(t).not.toMatch(/done|confirmed|booked it/i);
   });
@@ -127,17 +134,20 @@ describe("demo agent (STUB used when no LLM key is set)", () => {
     expect(t).toMatch(/cannot close this case/);
   });
 
-  it("a stay change goes to the traveller's own platform: compare_hotels card, no sample hotel, never says it is done", async () => {
+  it("a stay change compares SAMPLE hotel prices (labelled, per platform), no review card, never says it is done", async () => {
     events.length = 0;
     const t = await demoAgent("Extend my stay by 1 night", mk(), emit);
     expect(events.some((e) => e.t === "review")).toBe(false);
     const h = events.find((e) => e.t === "hotels") as Extract<UiEvent, { t: "hotels" }>;
     expect(h).toBeTruthy();
-    expect(h.configured).toBe(false);
-    expect(h.offers).toEqual([]);
+    expect(h.configured).toBe(true);
+    expect(h.sample).toBe(true);
+    expect(h.offers.length).toBeGreaterThan(0);
+    expect(h.offers[0].platformPrices!.length).toBe(4);
     expect(h.platforms.map((p) => p.name)).toEqual(["MakeMyTrip", "Goibibo", "Cleartrip", "ixigo"]);
     expect(h.query.nights).toBe(1);
-    expect(t).toMatch(/do not have a live hotel price feed/);
+    expect(t).toMatch(/sample hotel prices/i);
+    expect(t).toMatch(/not live prices/);
     expect(t).toMatch(/never see your password/);
   });
 

@@ -2,11 +2,12 @@ import { sql } from "drizzle-orm";
 import type { Db } from "@/lib/db/client";
 import * as s from "@/lib/db/schema";
 import { generateSeed, type SeedOptions } from "./generate";
+import { ensurePartnerMarkups } from "@/lib/providers/partners";
 
 const TABLES_IN_DELETE_ORDER = [
   "events", "login_codes", "sos_cases_local_sync", "price_breakups", "provider_offers", "rule_validations", "rule_sets", "trip_versions", "trip_drafts", "offline_packs", "sms_messages", "cases", "confirmations", "change_quotes", "tool_calls", "agent_messages",
   "agent_threads", "payments", "booking_items", "travellers", "bookings", "users", "transfers", "room_inventory", "hotels",
-  "flights", "itinerary_days", "itineraries", "pois", "destinations",
+  "flights", "itinerary_days", "itineraries", "pois", "destinations", "partner_markups", "mock_hotels",
 ];
 
 export async function truncateAll(db: Db) {
@@ -35,5 +36,6 @@ export async function seedCatalogue(db: Db, opts: SeedOptions, log: (m: string) 
   log("catalogue inserted, loading inventory…");
   await chunked(data.roomInventory, 2000, (c) => db.insert(s.roomInventory).values(c));
   await chunked(data.flights, 2000, (c) => db.insert(s.flights).values(c));
+  await ensurePartnerMarkups(db); // sample per-platform price rules for the mock partner API
   return data;
 }

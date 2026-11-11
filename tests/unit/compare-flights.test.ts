@@ -65,14 +65,19 @@ describe("compare_flights agent tool", () => {
   const mk = (): ToolCtx => ({ userId: c.neha.id, bookingRef: c.booking.ref, bookingId: c.booking.id, threadId: null, channel: "app", now: new Date(), ui: (e) => events.push(e) });
   beforeAll(async () => { c = await setupDb(); });
 
-  it("with no price source it says so and shows the platform picker instead (never invents a price)", async () => {
+  it("with no live price API it compares SAMPLE fares from the mock partner API, each priced on all four platforms", async () => {
     events.length = 0;
-    const out = (await runTool("compare_flights", {}, mk())) as { configured: boolean; next: string };
-    expect(out.configured).toBe(false);
-    expect(out.next).toMatch(/CANNOT compare prices/);
-    expect(events.some((e) => e.t === "compare")).toBe(false);
-    const pf = events.find((e) => e.t === "platforms") as Extract<UiEvent, { t: "platforms" }>;
-    expect(pf.platforms.map((p) => p.name)).toEqual(["MakeMyTrip", "Goibibo", "Cleartrip", "ixigo"]);
+    const out = (await runTool("compare_flights", {}, mk())) as { configured: boolean; sample: boolean; next: string };
+    expect(out.configured).toBe(true);
+    expect(out.sample).toBe(true);
+    expect(out.next).toMatch(/SAMPLE fares/);
+    expect(out.next).toMatch(/not live prices/);
+    const cmp = events.find((e) => e.t === "compare") as Extract<UiEvent, { t: "compare" }>;
+    expect(cmp.sample).toBe(true);
+    expect(cmp.providers[0].name).toBe("Safar Saathi mock partner API");
+    expect(cmp.offers.length).toBeGreaterThan(0);
+    for (const o of cmp.offers) expect(o.platformPrices!.length).toBe(4);
+    expect(events.some((e) => e.t === "platforms")).toBe(false);
   });
 
   it("with a configured price API it shows a comparison with pre-filled links for all four platforms", async () => {
@@ -83,6 +88,7 @@ describe("compare_flights agent tool", () => {
     expect(out.configured).toBe(true);
     expect(out.offers.map((o) => o.totalInr)).toEqual([11800, 15200]);
     const cmp = events.find((e) => e.t === "compare") as Extract<UiEvent, { t: "compare" }>;
+    expect(cmp.sample).toBe(false); // live keys set: the official API is used, not the mock partner API
     expect(cmp.offers.length).toBe(2);
     expect(cmp.cheapestId).toBe("amadeus:2");
     expect(cmp.platforms.map((p) => p.id)).toEqual(["makemytrip", "goibibo", "cleartrip", "ixigo"]);

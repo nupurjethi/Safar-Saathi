@@ -17,9 +17,10 @@ import { flightProviders, MOCK_SOURCE } from "@/lib/providers";
 import { searchWeb } from "@/lib/providers/web";
 import { refreshOfflinePack } from "@/lib/packs/refresh";
 import { connectedPlatforms } from "@/lib/server/connections";
-import { platformLinks } from "@/lib/providers/platforms";
-import { compareFlights } from "@/lib/providers/compare";
-import { compareHotels, type HotelOffer } from "@/lib/providers/hotels";
+import { platformLinks, PLATFORMS } from "@/lib/providers/platforms";
+import { compareFlightsOrSample } from "@/lib/providers/compare";
+import { compareHotelsOrSample, type HotelOffer } from "@/lib/providers/hotels";
+import type { PlatformPrice } from "@/lib/providers/partners";
 import { hotelLinks } from "@/lib/providers/platforms";
 import { addDays, fmtDate, inr, localDate, localTime, tzLabel, zonedToUtc } from "@/lib/time";
 import { rateSeverity, SLA_SECONDS, type Severity } from "../severity";
@@ -29,8 +30,8 @@ export type UiEvent =
   | { t: "case"; caseRef: string; severity: number; slaSeconds: number; summary: string }
   | { t: "route"; routeId: string; fromName: string; toName: string; distance_m: number; duration_s: number; approximate: boolean; url: string }
   | { t: "receipt"; receipt: unknown }
-  | { t: "compare"; bookingRef: string; itemId: string; query: { from: string; to: string; date: string; pax: number }; flight: { flightNo: string; carrier: string; from: string; to: string; date: string; departsLocal: string; arrivesLocal: string; departIso: string; arriveIso: string; pnr: string; leg: string; pax: number }; providers: { name: string; ok: boolean; count: number; error?: string }[]; offers: { id: string; providerLabel: string; source: string; totalInr: number; perTravellerInr: number; breakup: { label: string; amountInr: number }[]; facts: { carrier: string; flightNo: string; from: string; to: string; departLocal: string; arriveLocal: string; stops: number; durationMin?: number }; validUntil: string }[]; cheapestId?: string; fastestId?: string; platforms: { id: string; name: string; searchUrl: string; manageUrl: string; connected: boolean }[] }
-  | { t: "hotels"; bookingRef: string; itemId: string; configured: boolean; current: { name: string; city: string; address: string; checkin: string; checkout: string; rooms: number; lat: number; lon: number }; query: { checkin: string; checkout: string; nights: number; rooms: number; adults: number; city: string }; providers: { name: string; ok: boolean; count: number; error?: string }[]; offers: HotelOffer[]; cheapestId?: string; platforms: { id: string; name: string; hotelsUrl: string; connected: boolean }[] }
+  | { t: "compare"; bookingRef: string; itemId: string; query: { from: string; to: string; date: string; pax: number }; flight: { flightNo: string; carrier: string; from: string; to: string; date: string; departsLocal: string; arrivesLocal: string; departIso: string; arriveIso: string; pnr: string; leg: string; pax: number }; sample?: boolean; providers: { name: string; ok: boolean; count: number; error?: string }[]; offers: { id: string; providerLabel: string; source: string; totalInr: number; perTravellerInr: number; breakup: { label: string; amountInr: number }[]; facts: { carrier: string; flightNo: string; from: string; to: string; departLocal: string; arriveLocal: string; stops: number; durationMin?: number }; validUntil: string; platformPrices?: PlatformPrice[] }[]; cheapestId?: string; fastestId?: string; platforms: { id: string; name: string; searchUrl: string; manageUrl: string; connected: boolean }[] }
+  | { t: "hotels"; bookingRef: string; itemId: string; configured: boolean; sample?: boolean; current: { name: string; city: string; address: string; checkin: string; checkout: string; rooms: number; lat: number; lon: number }; query: { checkin: string; checkout: string; nights: number; rooms: number; adults: number; city: string }; providers: { name: string; ok: boolean; count: number; error?: string }[]; offers: HotelOffer[]; cheapestId?: string; platforms: { id: string; name: string; hotelsUrl: string; connected: boolean }[] }
   | { t: "platforms"; bookingRef: string; itemId: string; flight: { flightNo: string; carrier: string; from: string; to: string; date: string; departsLocal: string; arrivesLocal: string; departIso: string; arriveIso: string; pnr: string; leg: string; pax: number }; platforms: { id: string; name: string; searchUrl: string; manageUrl: string; connected: boolean }[] };
 
 export type ToolCtx = {
@@ -196,20 +197,28 @@ export async function compareFlightsTool(ctx: ToolCtx, input: { itemId?: string;
   const base = await connectPlatformTool(ctx, { itemId: input.itemId }, { silent: true });
   const flight = base.flight;
   const q = { from: (input.from ?? flight.from).toUpperCase(), to: (input.to ?? flight.to).toUpperCase(), date: input.date ?? flight.date, pax: flight.pax };
+  const pack = await loadPack(ctx);
+  const pf = pack.flights.find((x) => x.from === q.from) ?? pack.flights.find((x) => x.flight_no === flight.flightNo);
+  const pt = pack.flights.find((x) => x.to === q.to);
   const links = platformLinks(q).map((p) => ({ ...p, connected: base.connectedPlatforms.includes(p.id) }));
-  const res = await compareFlights(q);
-  if (!res.configured) {
+  const res = await compareFlightsOrSample({ ...q, fromTz: pf?.from === q.from ? pf.from_tz : undefined, toTz: pt?.to_tz });
+  if (!res.offers.length && !res.providers.some((p) => p.ok)) {
     ctx.ui({ t: "platforms", bookingRef: ctx.bookingRef, itemId: base.itemId, flight, platforms: links });
-    return { configured: false, shown: "platform picker", next: "No live price source is configured, so you CANNOT compare prices. Say so plainly. A picker to open MakeMyTrip, Goibibo, Cleartrip or ixigo (pre-filled) is on screen: tell the traveller to log in there, compare the prices they see, pay there, then enter the booking on the card. Never invent or estimate a price." };
+    return { configured: false, shown: "platform picker", next: "The price source did not answer, so you CANNOT compare prices right now. Say so plainly. A picker to open MakeMyTrip, Goibibo, Cleartrip or ixigo (pre-filled) is on screen: tell the traveller to log in there, pay there, then enter the booking on the card. Never invent or estimate a price." };
   }
-  ctx.ui({ t: "compare", bookingRef: ctx.bookingRef, itemId: base.itemId, query: q, flight, providers: res.providers, offers: res.offers.map((o) => ({ id: o.id, providerLabel: o.providerLabel, source: o.source, totalInr: o.totalInr, perTravellerInr: o.perTravellerInr, breakup: o.breakup, facts: o.facts, validUntil: o.validUntil })), cheapestId: res.cheapestId, fastestId: res.fastestId, platforms: links });
+  ctx.ui({ t: "compare", bookingRef: ctx.bookingRef, itemId: base.itemId, query: q, flight, sample: !!res.sample, providers: res.providers, offers: res.offers.map((o) => ({ id: o.id, providerLabel: o.providerLabel, source: o.source, totalInr: o.totalInr, perTravellerInr: o.perTravellerInr, breakup: o.breakup, facts: o.facts, validUntil: o.validUntil, platformPrices: o.platformPrices })), cheapestId: res.cheapestId, fastestId: res.fastestId, platforms: links });
+  const cheapest = res.offers[0];
+  const loggedIn = base.connectedPlatforms[0] ? PLATFORMS[base.connectedPlatforms[0]].name : undefined;
+  const onPlatform = cheapest?.platformPrices?.find((p) => p.platform === base.connectedPlatforms[0]);
   return {
-    configured: true, query: q, providers: res.providers,
-    offers: res.offers.map((o) => ({ source: o.source, flight: `${o.facts.carrier} ${o.facts.flightNo}`, departsLocal: o.facts.departLocal, arrivesLocal: o.facts.arriveLocal, stops: o.facts.stops, totalInr: o.totalInr, perTravellerInr: o.perTravellerInr })),
-    cheapest: res.offers[0] ? `${res.offers[0].facts.carrier} ${res.offers[0].facts.flightNo} at ₹${res.offers[0].totalInr} for ${q.pax}` : null,
-    next: res.offers.length
-      ? "A comparison table is on the traveller's screen with live fares from official price APIs. Summarise the cheapest and the fastest in 2-3 sentences. Say these are reference fares: MakeMyTrip, Goibibo, Cleartrip and ixigo can show a different price, so the traveller should open their platform from the card (pre-filled), log in there, check the same flight, and pay there. You cannot log in to or read prices from those platforms and Safar Saathi cannot take the payment. After paying, the traveller records the booking on the card."
-      : "The price APIs returned no flights for this route and day. Say so, and suggest another date or the platform picker.",
+    configured: true, sample: !!res.sample, query: q, providers: res.providers, loggedInPlatform: loggedIn ?? null,
+    offers: res.offers.map((o) => ({ source: o.source, flight: `${o.facts.carrier} ${o.facts.flightNo}`, departsLocal: o.facts.departLocal, arrivesLocal: o.facts.arriveLocal, stops: o.facts.stops, totalInr: o.totalInr, perTravellerInr: o.perTravellerInr, platformPrices: o.platformPrices?.map((p) => ({ platform: p.name, totalInr: p.totalInr })) })),
+    cheapest: cheapest ? `${cheapest.facts.carrier} ${cheapest.facts.flightNo} at ₹${cheapest.totalInr} for ${q.pax}${onPlatform ? ` (₹${onPlatform.totalInr} on ${onPlatform.name})` : ""}` : null,
+    next: !res.offers.length
+      ? "The price source returned no flights for this route and day. Say so, and suggest another date or the platform picker."
+      : res.sample
+        ? `A comparison of SAMPLE fares from the Safar Saathi mock partner API is on screen, with each booking platform's sample price. Summarise the cheapest and the fastest in 2-3 sentences and say clearly these are sample prices, not live prices. Then tell the traveller to pay on the platform they are logged in to${loggedIn ? ` (${loggedIn})` : " (they choose it at the top of the chat)"}: the "Pay on ..." button opens that site, where they log in, find the flight and pay. Safar Saathi cannot take payment. After paying, they record the booking on the card.`
+        : "A comparison table is on the traveller's screen with live fares from official price APIs. Summarise the cheapest and the fastest in 2-3 sentences. Say these are reference fares: MakeMyTrip, Goibibo, Cleartrip and ixigo can show a different price, so the traveller should open the platform they are logged in to from the card, check the same flight, and pay there. You cannot log in to or read prices from those platforms and Safar Saathi cannot take the payment. After paying, the traveller records the booking on the card.",
   };
 }
 
@@ -229,17 +238,20 @@ export async function compareHotelsTool(ctx: ToolCtx, input: { extraNights?: num
   const checkin = input.checkin ?? String(d.checkoutDate);
   const query = { checkin, checkout: addDays(checkin, nights), nights, rooms: Number(d.rooms), adults: pack.booking.pax, city: String(d.cityName ?? d.city) };
   const connected = await connectedPlatforms(ctx.userId, db);
-  const res = await compareHotels({ lat: Number(d.lat), lon: Number(d.lon), checkin: query.checkin, checkout: query.checkout, rooms: query.rooms, adults: query.adults });
+  const res = await compareHotelsOrSample({ lat: Number(d.lat), lon: Number(d.lon), checkin: query.checkin, checkout: query.checkout, rooms: query.rooms, adults: query.adults, cityName: query.city, citySlug: String(d.city ?? "") });
   const platforms = hotelLinks().map((p) => ({ ...p, connected: connected.includes(p.id as never) }));
-  ctx.ui({ t: "hotels", bookingRef: ctx.bookingRef, itemId: cur.id, configured: res.configured, current: { name: String(d.name), city: query.city, address: String(d.address), checkin: String(d.checkinDate), checkout: String(d.checkoutDate), rooms: query.rooms, lat: Number(d.lat), lon: Number(d.lon) }, query, providers: res.providers, offers: res.offers, cheapestId: res.cheapestId, platforms });
-  if (!res.configured) return { configured: false, query, next: "No live hotel price source is configured, so you CANNOT compare prices. Say so plainly. A card with links to MakeMyTrip, Goibibo, Cleartrip and ixigo hotel search and the details to enter is on screen: tell the traveller to log in there, compare, pay there, then record the booking on the card. Never invent a price." };
+  ctx.ui({ t: "hotels", bookingRef: ctx.bookingRef, itemId: cur.id, configured: res.configured, sample: !!res.sample, current: { name: String(d.name), city: query.city, address: String(d.address), checkin: String(d.checkinDate), checkout: String(d.checkoutDate), rooms: query.rooms, lat: Number(d.lat), lon: Number(d.lon) }, query, providers: res.providers, offers: res.offers, cheapestId: res.cheapestId, platforms });
+  const loggedIn = connected[0] ? PLATFORMS[connected[0]].name : undefined;
+  if (!res.configured || (!res.offers.length && !res.providers.some((p) => p.ok))) return { configured: false, query, next: "The hotel price source did not answer, so you CANNOT compare prices right now. Say so plainly. A card with links to MakeMyTrip, Goibibo, Cleartrip and ixigo hotel search and the details to enter is on screen: tell the traveller to log in there, book and pay there, then record the booking on the card. Never invent a price." };
   return {
-    configured: true, query, providers: res.providers,
-    offers: res.offers.map((o) => ({ hotel: o.hotelName, room: o.roomType, totalInr: o.totalInr, perNightInr: o.perNightInr, refundable: o.refundable, source: o.source })),
+    configured: true, sample: !!res.sample, query, providers: res.providers, loggedInPlatform: loggedIn ?? null,
+    offers: res.offers.map((o) => ({ hotel: o.hotelName, room: o.roomType, totalInr: o.totalInr, perNightInr: o.perNightInr, refundable: o.refundable, source: o.source, platformPrices: o.platformPrices?.map((p) => ({ platform: p.name, totalInr: p.totalInr })) })),
     cheapest: res.offers[0] ? `${res.offers[0].hotelName} at ₹${res.offers[0].totalInr} for ${nights} night(s)` : null,
-    next: res.offers.length
-      ? "A hotel comparison is on screen with live prices from an official API. Summarise the cheapest in 2 sentences. These are reference prices: MakeMyTrip, Goibibo, Cleartrip and ixigo can differ, so the traveller opens their platform from the card, logs in, books and pays there. You cannot log in, read those prices or take payment. After booking they record it on the card and tap Yes."
-      : "The price source returned no hotels for those dates. Say so and suggest other dates or searching on a platform from the card.",
+    next: !res.offers.length
+      ? "The price source returned no hotels for those dates. Say so and suggest other dates or searching on a platform from the card."
+      : res.sample
+        ? `A comparison of SAMPLE hotel prices from the Safar Saathi mock partner API is on screen, with each booking platform's sample price. Summarise the cheapest in 2 sentences and say clearly these are sample prices, not live prices. Tell the traveller to book and pay on the platform they are logged in to${loggedIn ? ` (${loggedIn})` : " (they choose it at the top of the chat)"} using the "Pay on ..." button; Safar Saathi cannot take payment. Extending a stay does not move the flight. After booking they record it on the card and tap Yes.`
+        : "A hotel comparison is on screen with live prices from an official API. Summarise the cheapest in 2 sentences. These are reference prices: the booking platforms can differ, so the traveller opens the platform they are logged in to from the card, books and pays there. You cannot log in, read those prices or take payment. After booking they record it on the card and tap Yes.",
   };
 }
 

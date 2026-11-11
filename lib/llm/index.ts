@@ -21,7 +21,7 @@ export function getModel(): { model: LanguageModel; label: string } | null {
   return { model: createAnthropic({ apiKey: key })(name), label: `anthropic:${name}` };
 }
 
-export type LlmRequest = { purpose: "rules" | "agent"; promptVersion: string; system: string; prompt: string };
+export type LlmRequest = { purpose: "rules" | "agent" | "plan"; promptVersion: string; system: string; prompt: string; /** data: URLs of images the model should read (vision) */ images?: string[]; maxOutputTokens?: number };
 type Drafter = (req: LlmRequest) => Promise<string>;
 let testDrafter: Drafter | null = null;
 /** Tests only: replace the model with a scripted function. */
@@ -52,7 +52,9 @@ export async function llmJson(req: LlmRequest): Promise<{ ok: true; data: unknow
     else {
       const m = getModel();
       if (!m) return { ok: false, error: "No LLM configured" };
-      const r = await generateText({ model: m.model, system: req.system, prompt: req.prompt, temperature: 0.2, maxOutputTokens: 6000 } as never);
+      const r = req.images?.length
+        ? await generateText({ model: m.model, system: req.system, messages: [{ role: "user", content: [{ type: "text", text: req.prompt }, ...req.images.map((image) => ({ type: "image", image }))] }], temperature: 0.1, maxOutputTokens: req.maxOutputTokens ?? 12000 } as never)
+        : await generateText({ model: m.model, system: req.system, prompt: req.prompt, temperature: req.purpose === "plan" ? 0.1 : 0.2, maxOutputTokens: req.maxOutputTokens ?? 6000 } as never);
       text = (r as { text: string }).text;
     }
     const data = extractJson(text);

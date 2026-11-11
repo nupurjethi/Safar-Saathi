@@ -34,7 +34,7 @@ export function TripsList() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-[32px] font-bold leading-tight">My trips</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-[32px] font-bold leading-tight">My trips</h1><LinkButton href="/plans/new" variant="primary" size="md" data-testid="add-plan-btn">Add travel plan</LinkButton></div>
       {trips === null ? <div className="space-y-3"><Skeleton className="h-32" /><Skeleton className="h-32" /></div>
         : trips.length === 0 ? (
           <EmptyState title={auth ? "No trips yet" : "Sign in to see your trips"} body={auth ? "Book a sample trip and your offline guide is ready in under a minute." : status === "online" ? "Use the demo account to see a ready-made Paris to Rome trip." : "You are offline and nothing is saved on this phone yet."}

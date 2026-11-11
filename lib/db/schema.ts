@@ -1,4 +1,5 @@
 import {
+  customType,
   boolean,
   doublePrecision,
   index,
@@ -205,7 +206,10 @@ export const bookings = pgTable(
     id: id(),
     ref: varchar("ref", { length: 10 }).notNull().unique(),
     userId: uuid("user_id").notNull().references(() => users.id),
-    itineraryId: uuid("itinerary_id").notNull().references(() => itineraries.id),
+    /** Catalogue trips point at an itinerary. Uploaded travel plans (source "upload") have none and point at a travel plan instead. */
+    itineraryId: uuid("itinerary_id").references(() => itineraries.id),
+    planId: uuid("plan_id").references(() => travelPlans.id),
+    source: varchar("source", { length: 12 }).notNull().default("catalogue"), // catalogue | upload
     startDate: date("start_date", { mode: "string" }).notNull(),
     endDate: date("end_date", { mode: "string" }).notNull(),
     pax: integer("pax").notNull(),
@@ -242,6 +246,93 @@ export const payments = pgTable("payments", {
   method: varchar("method", { length: 12 }).notNull().default("dummy"),
   amountInr: integer("amount_inr").notNull(),
   status: varchar("status", { length: 12 }).notNull().default("paid"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** A travel plan the traveller uploaded (PDF, Word, Excel, images...). Gemini reads it; the offline bundle is built from it. */
+export const travelPlans = pgTable("travel_plans", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  bookingId: uuid("booking_id"), // the trip created from this plan (no FK: bookings.plan_id points back here)
+  title: text("title").notNull().default("My travel plan"),
+  status: varchar("status", { length: 16 }).notNull().default("uploading"), // uploading | processing | ready | failed
+  /** Structured plan extracted by the model (lib/plans/schema.ts). The raw documents are NOT kept after processing. */
+  extracted: jsonb("extracted").$type<Record<string, unknown>>(),
+  warnings: jsonb("warnings").$type<string[]>().notNull().default([]),
+  model: text("model"),
+  error: text("error"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** One uploaded file. Its text (or image) is held only until the plan is processed, then cleared. */
+export const planFiles = pgTable("plan_files", {
+  id: id(),
+  planId: uuid("plan_id").notNull().references(() => travelPlans.id),
+  name: text("name").notNull(),
+  mime: varchar("mime", { length: 120 }).notNull(),
+  kind: varchar("kind", { length: 12 }).notNull(), // pdf | word | sheet | image | text | unsupported
+  bytes: integer("bytes").notNull(),
+  sha256: text("sha256").notNull(),
+  status: varchar("status", { length: 12 }).notNull().default("parsed"), // parsed | skipped
+  note: text("note"),
+  text: text("text"),
+  imageDataUrl: text("image_data_url"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** Mock partner price rules (sample data): how each booking platform marks up the mock base fare or room rate. */
+export const partnerMarkups = pgTable(
+  "partner_markups",
+  {
+    id: id(),
+    platform: varchar("platform", { length: 16 }).notNull(), // makemytrip | goibibo | cleartrip | ixigo
+    kind: varchar("kind", { length: 8 }).notNull(), // flight | hotel
+    markupBps: integer("markup_bps").notNull(), // basis points over the mock base price (e.g. 350 = 3.5%)
+    feeInr: integer("fee_inr").notNull(), // convenience fee per booking
+    discountBps: integer("discount_bps").notNull().default(0),
+    note: text("note"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("partner_markup_uq").on(t.platform, t.kind)],
+);
+
+/**
+ * Mock hotels the mock partner API generates on demand for places outside the seeded catalogue (e.g. cities from an
+ * uploaded travel plan). Sample data, deterministic per area. Seeded catalogue hotels stay in `hotels`.
+ */
+export const mockHotels = pgTable(
+  "mock_hotels",
+  {
+    id: id(),
+    areaKey: varchar("area_key", { length: 40 }).notNull(), // lat,lon rounded to 0.1 degree
+    cityName: text("city_name").notNull(),
+    name: text("name").notNull(),
+    stars: integer("stars").notNull(),
+    lat: doublePrecision("lat").notNull(),
+    lon: doublePrecision("lon").notNull(),
+    address: text("address").notNull(),
+    nightlyBaseInr: integer("nightly_base_inr").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("mock_hotels_area_idx").on(t.areaKey)],
+);
+
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
+
+/** Offline street-map files (PMTiles) generated on demand for cities in uploaded plans that our pre-built tiles do not cover. */
+export const mapTiles = pgTable("map_tiles", {
+  id: id(),
+  key: varchar("key", { length: 80 }).notNull().unique(), // e.g. plan-<uuid>-goa
+  bytes: integer("bytes").notNull(),
+  sha256: text("sha256").notNull(),
+  bbox: jsonb("bbox").$type<[number, number, number, number]>().notNull(),
+  maxZoom: integer("max_zoom").notNull(),
+  data: bytea("data").notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

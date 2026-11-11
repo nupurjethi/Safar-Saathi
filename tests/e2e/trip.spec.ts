@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { REF, agentEvents, ask, askForCard, booking, loginAs } from "./helpers";
+import { REF, agentEvents, ask, booking, loginAs } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -128,10 +128,24 @@ test("1. Explore → select → guide ready → offline guide/map/address card/S
 
   // 7-8. flight change: no sample flights. The agent sends the traveller to their own booking platform, then records the new flight through the Confirm gate
   await page.goto(`/trips/${ref}/chat`);
+  // "I'm logged in to": the traveller picks their booking platform at the top of the chat
+  await expect(page.getByTestId("platform-selector")).toBeVisible();
+  await page.getByTestId("platform-choice-goibibo").click();
+  await expect(page.getByTestId("platform-choice-goibibo")).toHaveAttribute("aria-checked", "true");
   await ask(page, "Please move my flight later");
+  // the agent compares sample fares from the mock partner API (stored in the database), shown per platform
+  const cmp = page.getByTestId("compare-card").last();
+  await expect(cmp).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("assistant-text").last()).toContainText("mock partner API");
+  expect(await cmp.getByTestId("compare-offer").count()).toBeGreaterThan(0);
+  await expect(cmp).toContainText(/sample/i);
+  const pay = cmp.getByTestId("pay-on-platform");
+  await expect(pay).toContainText("Goibibo"); // pay on the platform the traveller is logged in to
+  expect(await pay.getAttribute("href")).toMatch(/^https:\/\/www\.goibibo\.com\//);
+  expect(await pay.getAttribute("target")).toBe("_blank");
+  await cmp.getByTestId("compare-record").click(); // "I have paid: record my booking"
   const pc = page.getByTestId("platform-card").last();
-  await expect(pc).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId("assistant-text").last()).toContainText("never see your password");
+  await expect(pc).toBeVisible();
   await expect(pc.getByTestId("platform-row")).toHaveCount(4);
   for (const name of ["MakeMyTrip", "Goibibo", "Cleartrip", "ixigo"]) await expect(pc.getByTestId("platform-list")).toContainText(name);
   const href = await pc.getByTestId("platform-open").first().getAttribute("href");
@@ -156,7 +170,7 @@ test("1. Explore → select → guide ready → offline guide/map/address card/S
   const card = page.getByTestId("review-card").last();
   await expect(card).toBeVisible();
   await expect(card).toContainText("Record your flight change");
-  await expect(card.getByTestId("offer-source")).toContainText("Entered by you from MakeMyTrip");
+  await expect(card.getByTestId("offer-source")).toContainText("Entered by you from Goibibo"); // the platform the traveller said they are logged in to
   await expect(card.getByTestId("review-notice")).toContainText("books and charges nothing");
   expect(await card.getByTestId("breakup-line").count()).toBe(2);
   await expect(card.getByTestId("price-delta")).toContainText("6,000");
@@ -227,7 +241,7 @@ test("5. apply without a token, and with a reused token, are both rejected", asy
   await loginAs(page, "traveller", "/trips");
   // a quote to try the gate on: the agent shows the platform picker (no review card); the traveller then records the new flight
   const ev = (await agentEvents(page, "Please move my flight later")) as unknown as { t: string; itemId?: string; flight?: { departIso: string; arriveIso: string } }[];
-  const pf = ev.find((e) => e.t === "platforms")!;
+  const pf = ev.find((e) => e.t === "compare" || e.t === "platforms")!;
   expect(pf.itemId).toBeTruthy();
   const made = await page.request.post(`/api/trips/${REF}/external-change`, { data: { platform: "cleartrip", itemId: pf.itemId, flightNo: "6E 212", carrierName: "IndiGo", departLocal: pf.flight!.departIso, arriveLocal: pf.flight!.arriveIso, pnr: "XY98ZT", fareDiffInr: 1500, changeFeeInr: 500 } });
   expect(made.status()).toBe(201);
@@ -261,50 +275,69 @@ test("6. simulated SMS 'SOS lost passport SS-48213' → severity-1 case and a re
   await expect(page.getByTestId("sla").first()).toBeVisible();
 });
 
-test("7. offline assistant: with no network the chat answers from the saved bundle (hotel, passport, change request), and falls back when the agent fails", async ({ page, context }) => {
+test("7. offline assistant is its own chat: answers from the saved trip with no network, keeps its history, and never mixes with the Trip agent", async ({ page, context }) => {
+  const askOffline = async (text: string) => { await page.getByTestId("oa-input").fill(text); await page.getByTestId("oa-input").press("Enter"); };
   await loginAs(page, "traveller", `/trips/${REF}/chat`);
   await expect(page.getByTestId("chat-log")).toBeVisible(); // the bundle is on this phone once the chat renders
-  await expect(page.getByTestId("offline-assistant")).toBeVisible();
+  await expect(page.getByTestId("chat-tab-online")).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("offline-assistant")).toHaveCount(0); // no offline toggle inside the online chat any more
 
-  // (a) the online agent is unreachable → the question is answered from the saved bundle instead of an error
-  await page.route("**/api/agent", (r) => r.abort());
+  // (a) the online agent fails → an error and a link to the offline assistant, never an offline answer inside this chat
+  await page.route("**/api/agent", (r) => (r.request().method() === "POST" ? r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "The Trip agent could not answer just now." }) }) : r.continue()));
   await ask(page, "when is my pickup");
-  await expect(page.getByTestId("oa-answer").last()).toContainText("Pickup code", { timeout: 15_000 });
-  await expect(page.getByTestId("oa-answer").last()).toContainText("rule-based, not AI");
+  await expect(page.getByTestId("ask-offline-assistant").last()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("oa-answer")).toHaveCount(0);
   await page.unroute("**/api/agent");
 
-  // (b) airplane mode
-  await context.setOffline(true);
-  await expect(page.getByRole("status").filter({ hasText: "You are offline" })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId("offline-assistant")).toHaveAttribute("aria-pressed", "true");
+  // open the offline assistant once online so the phone has the page
+  await page.getByTestId("chat-tab-offline").click();
+  await expect(page.getByTestId("offline-chat")).toBeVisible();
+  await page.getByTestId("chat-tab-online").click();
+  await expect(page.getByTestId("chat-log")).toBeVisible();
 
-  await ask(page, "Where is my hotel?");
+  // (b) airplane mode: the online chat says so and points to the offline assistant
+  await context.setOffline(true);
+  await expect(page.getByTestId("online-offline-banner")).toContainText("You are offline. The Trip agent needs internet.", { timeout: 20_000 });
+  await page.getByTestId("chat-tab-offline").click();
+  await expect(page.getByTestId("offline-chat")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("chat-tab-offline")).toHaveAttribute("aria-current", "page");
+  if (await page.getByTestId("oa-clear").count()) await page.getByTestId("oa-clear").click(); // start this run from an empty offline chat
+
+  await askOffline("Where is my hotel?");
   const hotel = page.getByTestId("oa-answer").last();
   await expect(hotel).toContainText("Show this to a driver");
   await expect(hotel).toContainText("Check-in");
   await expect(hotel.getByTestId("oa-cites")).toContainText("Your booking");
 
-  await ask(page, "passport kho gaya"); // Hinglish → the frozen lost-passport rule set, rendered step by step
+  await askOffline("passport kho gaya"); // Hinglish → the frozen lost-passport rule set, rendered step by step
   const passport = page.getByTestId("oa-answer").last();
   await expect(passport).toContainText("Lost passport");
-  await expect(passport.getByTestId("oa-steps").locator("li").first()).toBeVisible();
   expect(await passport.getByTestId("oa-steps").locator("li").count()).toBeGreaterThanOrEqual(5);
   await expect(passport).toContainText("Police number");
   await passport.getByTestId("oa-option").first().click(); // decision tree works offline
   expect(await passport.getByTestId("oa-steps").locator("li").count()).toBeGreaterThanOrEqual(7);
 
-  const cardsBefore = await page.getByTestId("review-card").count(); // older cards restored from chat history are fine
-  await ask(page, "please move my flight later"); // never changes anything offline
+  await askOffline("please move my flight later"); // never changes anything offline
   await expect(page.getByTestId("oa-answer").last()).toContainText("Changes need a connection and your Confirm tap");
-  await expect(page.getByTestId("review-card")).toHaveCount(cardsBefore); // no new review card, nothing changed
+  await expect(page.getByTestId("review-card")).toHaveCount(0);
 
-  await ask(page, "what is the capital of mars");
+  await askOffline("what is the capital of mars");
   await expect(page.getByTestId("oa-answer").last()).toContainText("I can't answer that offline");
   await page.getByTestId("oa-queue").last().click();
   await expect(page.getByTestId("oa-queue").last()).toContainText("Queued for the Trip agent");
+  await expect(page.getByTestId("oa-queued-note").last()).toBeVisible();
 
-  await page.getByTestId("oa-chip").first().click(); // suggested questions are answered too
-  await expect.poll(async () => page.getByTestId("oa-answer").count()).toBeGreaterThanOrEqual(6);
+  // the offline chat history stays on the phone
+  const answers = await page.getByTestId("oa-answer").count();
+  expect(answers).toBe(4);
+  await page.reload();
+  await expect(page.getByTestId("offline-chat")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("oa-answer")).toHaveCount(answers);
+
+  // and it never appears in the online chat
+  await page.getByTestId("chat-tab-online").click();
+  await expect(page.getByTestId("online-offline-banner")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("oa-answer")).toHaveCount(0);
   await context.setOffline(false);
 });
 
@@ -388,7 +421,8 @@ test("11. hotel change: the agent sends you to your platform, you record the boo
   await expect(page.getByTestId("assistant-text").last()).toContainText("never see your password");
   await expect(hc.getByTestId("hotel-platform-open")).toHaveCount(4);
   expect(await hc.getByTestId("hotel-platform-open").first().getAttribute("href")).toMatch(/^https:\/\//);
-  await expect(hc).toContainText("cannot compare prices"); // no live hotel price source in this environment: it says so, no invented prices
+  await expect(hc).toContainText(/sample/i); // sample prices from the mock partner API, clearly labelled
+  expect(await hc.getByTestId("hotel-offer").count()).toBeGreaterThan(0);
   await hc.getByTestId("hf-amount").fill("9800");
   await hc.getByTestId("hf-submit").click();
   const card = page.getByTestId("review-card").last();
@@ -398,4 +432,22 @@ test("11. hotel change: the agent sends you to your platform, you record the boo
   await card.getByTestId("confirm-btn").click();
   await expect(page.getByTestId("receipt-card").last()).toContainText("you paid on the platform");
   await expect(page.getByTestId("guide-update").last()).toContainText("Offline guide updated to version");
+});
+
+test("12. Add travel plan: upload several files, each is read, and the plan is processed (no AI model in this test, so it says so plainly)", async ({ page }) => {
+  await loginAs(page, "traveller", "/plans/new");
+  await expect(page.getByTestId("add-plan")).toBeVisible();
+  await page.getByTestId("plan-input").setInputFiles([
+    { name: "itinerary.txt", mimeType: "text/plain", buffer: Buffer.from("Flight 6E 6143 BLR to GOX on 12 Dec 2026 07:15. Hotel Taj Holiday Village, Candolim, Goa, 12-15 Dec.") },
+    { name: "days.csv", mimeType: "text/csv", buffer: Buffer.from("date,time,what,where\n2026-12-13,09:30,Fort visit,Fort Aguada") },
+    { name: "slides.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", buffer: Buffer.from("x") },
+  ]);
+  await expect(page.getByTestId("plan-file")).toHaveCount(3);
+  await page.getByTestId("plan-build").click();
+  await expect(page.locator('[data-testid="plan-file"][data-state="read"]')).toHaveCount(2, { timeout: 20_000 });
+  await expect(page.locator('[data-testid="plan-file"][data-state="skipped"]')).toHaveCount(1);
+  await expect(page.getByTestId("plan-error")).toContainText("No AI model is configured", { timeout: 20_000 });
+  // the entry points exist for signed-in travellers
+  await page.goto("/trips");
+  await expect(page.getByTestId("add-plan-btn")).toBeVisible();
 });
