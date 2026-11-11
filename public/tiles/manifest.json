@@ -1,210 +1,522 @@
 {
   "abu-dhabi-core": {
     "bytes": 4204938,
-    "hash": "sha256:c030e3a8e19b2fd7eff7bb17aa2d174f39c4ff45cf7f001c92a3b6a29874fbdd"
+    "hash": "sha256:c030e3a8e19b2fd7eff7bb17aa2d174f39c4ff45cf7f001c92a3b6a29874fbdd",
+    "bbox": [
+      54.3913,
+      24.4037,
+      54.5313,
+      24.5437
+    ]
   },
   "abu-dhabi": {
     "bytes": 1359429,
-    "hash": "sha256:7c38e2eaf7356eb213515c6e699c245f6d2114182155f27b7a6bedc76d2c69ef"
+    "hash": "sha256:7c38e2eaf7356eb213515c6e699c245f6d2114182155f27b7a6bedc76d2c69ef",
+    "bbox": [
+      54.277,
+      24.3728,
+      54.6911,
+      24.5736
+    ]
   },
   "amsterdam-core": {
     "bytes": 9369975,
-    "hash": "sha256:0526cde850a466da2e92a0c23f9cae1a06dbadcd591f5b31926f86f7652fd567"
+    "hash": "sha256:0526cde850a466da2e92a0c23f9cae1a06dbadcd591f5b31926f86f7652fd567",
+    "bbox": [
+      4.8536,
+      52.3418,
+      4.9153,
+      52.3941
+    ]
   },
   "amsterdam": {
     "bytes": 3603552,
-    "hash": "sha256:8e7c26f211bf09394f8ea1f1317030005c15f83acd1302b8c7517d2b4c6d2a19"
+    "hash": "sha256:8e7c26f211bf09394f8ea1f1317030005c15f83acd1302b8c7517d2b4c6d2a19",
+    "bbox": [
+      4.7283,
+      52.2705,
+      4.9403,
+      52.4191
+    ]
   },
   "athens-core": {
     "bytes": 5034170,
-    "hash": "sha256:482b54283f3cd8c765fef45aa5a5e6803c095a82aeacebd062702521dc7103e0"
+    "hash": "sha256:482b54283f3cd8c765fef45aa5a5e6803c095a82aeacebd062702521dc7103e0",
+    "bbox": [
+      23.707,
+      37.9534,
+      23.7561,
+      37.991
+    ]
   },
   "athens": {
     "bytes": 2433056,
-    "hash": "sha256:8295b932cbc038e837d8d9dde9f97d32e4e1c5e7b08346b4ce4cb831a7821b43"
+    "hash": "sha256:8295b932cbc038e837d8d9dde9f97d32e4e1c5e7b08346b4ce4cb831a7821b43",
+    "bbox": [
+      23.682,
+      37.8964,
+      23.9845,
+      38.016
+    ]
   },
   "bali-core": {
     "bytes": 10622377,
-    "hash": "sha256:417872d6f620421f50e66480d4fd0095fe4bfcc6a3ce7a3e921a02a6618125b2"
+    "hash": "sha256:417872d6f620421f50e66480d4fd0095fe4bfcc6a3ce7a3e921a02a6618125b2",
+    "bbox": [
+      115.1121,
+      -8.7001,
+      115.2521,
+      -8.5601
+    ]
   },
   "bali": {
     "bytes": 2337846,
-    "hash": "sha256:c2be69a8388a444b0352efbcff8e4ca6c510f2ba2782bae5ba28863bee287af9"
+    "hash": "sha256:c2be69a8388a444b0352efbcff8e4ca6c510f2ba2782bae5ba28863bee287af9",
+    "bbox": [
+      115.0449,
+      -8.8691,
+      115.3193,
+      -8.3912
+    ]
   },
   "bangalore-core": {
     "bytes": 28025116,
-    "hash": "sha256:f4e54ad9c912dd8275cdad39cbebf4049a67ad81b78a02b6a3c1bd53dd765f25"
+    "hash": "sha256:f4e54ad9c912dd8275cdad39cbebf4049a67ad81b78a02b6a3c1bd53dd765f25",
+    "bbox": [
+      77.47,
+      12.78,
+      77.72,
+      13.06
+    ]
   },
   "bangalore": {
     "bytes": 15537105,
-    "hash": "sha256:f27b7a2c8e49f29af5ad2613cf3cc998aeae0b10fd95a94acafeae67d70b18de"
+    "hash": "sha256:f27b7a2c8e49f29af5ad2613cf3cc998aeae0b10fd95a94acafeae67d70b18de",
+    "bbox": [
+      77.4,
+      12.74,
+      77.8199999,
+      13.23
+    ]
   },
   "bangkok-core": {
     "bytes": 8487716,
-    "hash": "sha256:8b1427188e375fec9801e33652abed4160658113b360b082d7cab5443faf6968"
+    "hash": "sha256:8b1427188e375fec9801e33652abed4160658113b360b082d7cab5443faf6968",
+    "bbox": [
+      100.473,
+      13.7164,
+      100.5654,
+      13.8148
+    ]
   },
   "bangkok": {
     "bytes": 3404956,
-    "hash": "sha256:0b6e1d127acbf99ce1a36c0d6af3ecdf14b428028ff656e522699bebebe18edd"
+    "hash": "sha256:0b6e1d127acbf99ce1a36c0d6af3ecdf14b428028ff656e522699bebebe18edd",
+    "bbox": [
+      100.4488,
+      13.65,
+      100.7901,
+      13.8398
+    ]
   },
   "barcelona-core": {
     "bytes": 11615172,
-    "hash": "sha256:372d97dd8a063595ac6373ddc0059ae925703c795d4fb200b8ae02de557bc2fc"
+    "hash": "sha256:372d97dd8a063595ac6373ddc0059ae925703c795d4fb200b8ae02de557bc2fc",
+    "bbox": [
+      2.1377,
+      41.3619,
+      2.2075,
+      41.4321
+    ]
   },
   "barcelona": {
     "bytes": 2538224,
-    "hash": "sha256:717d77dc9d34a7246176f005b5146893ab6dceafdf55229d9f48677327968acb"
+    "hash": "sha256:717d77dc9d34a7246176f005b5146893ab6dceafdf55229d9f48677327968acb",
+    "bbox": [
+      2.0433,
+      41.2573999,
+      2.2325,
+      41.4545
+    ]
   },
   "colombo-core": {
     "bytes": 1861336,
-    "hash": "sha256:c327ceff98dd4b05b70928b71407be76c72e2b14af27eb5e3be88f5070c684de"
+    "hash": "sha256:c327ceff98dd4b05b70928b71407be76c72e2b14af27eb5e3be88f5070c684de",
+    "bbox": [
+      79.83,
+      6.8947,
+      79.876,
+      6.952
+    ]
   },
   "colombo": {
     "bytes": 1413421,
-    "hash": "sha256:40c320bc67521dac5b5fd0aa986a13e3c1194b45e1f0d65e249ca780a66a857c"
+    "hash": "sha256:40c320bc67521dac5b5fd0aa986a13e3c1194b45e1f0d65e249ca780a66a857c",
+    "bbox": [
+      79.805,
+      6.8697,
+      79.9241,
+      7.2208
+    ]
   },
   "dubai-core": {
     "bytes": 5713157,
-    "hash": "sha256:16b36f833069043c49be078eb13067b282b9653a2d37805fd4cb11ab06d34de4"
+    "hash": "sha256:16b36f833069043c49be078eb13067b282b9653a2d37805fd4cb11ab06d34de4",
+    "bbox": [
+      55.1372,
+      25.1019,
+      55.2772,
+      25.2419
+    ]
   },
   "dubai": {
     "bytes": 1848887,
-    "hash": "sha256:838c13ea06c22ba7e6679e11cfc5a3860bcb922ab3838ffa8caf6330b0ce9b81"
+    "hash": "sha256:838c13ea06c22ba7e6679e11cfc5a3860bcb922ab3838ffa8caf6330b0ce9b81",
+    "bbox": [
+      55.0771,
+      25.04,
+      55.4057,
+      25.3037
+    ]
   },
   "hanoi-core": {
     "bytes": 4733389,
-    "hash": "sha256:74da2f131a2ea733838d1b2f65ef431b389a3d5559af1bd65b93767d4195fd8f"
+    "hash": "sha256:74da2f131a2ea733838d1b2f65ef431b389a3d5559af1bd65b93767d4195fd8f",
+    "bbox": [
+      105.8081,
+      21.0095,
+      105.8698,
+      21.0733
+    ]
   },
   "hanoi": {
     "bytes": 1666026,
-    "hash": "sha256:45e0ed0bfcb14e269e8f68cbc2c680f74447e170707781f5949fe59f7b813e6a"
+    "hash": "sha256:45e0ed0bfcb14e269e8f68cbc2c680f74447e170707781f5949fe59f7b813e6a",
+    "bbox": [
+      105.7672,
+      20.9845,
+      105.8922,
+      21.2612
+    ]
   },
   "ho-chi-minh-city-core": {
     "bytes": 3022883,
-    "hash": "sha256:2838884cb5fade001f5869e5db8f19641d2170e51fd8c33ceb74a6035b068749"
+    "hash": "sha256:2838884cb5fade001f5869e5db8f19641d2170e51fd8c33ceb74a6035b068749",
+    "bbox": [
+      106.6772,
+      10.7522,
+      106.7193,
+      10.797
+    ]
   },
   "ho-chi-minh-city": {
     "bytes": 1416503,
-    "hash": "sha256:ef344feedb5f285b759f0d4a9500ab12c042811249a654d45b13197fe16d1deb"
+    "hash": "sha256:ef344feedb5f285b759f0d4a9500ab12c042811249a654d45b13197fe16d1deb",
+    "bbox": [
+      106.612,
+      10.7272,
+      106.7443,
+      10.8588
+    ]
   },
   "hong-kong-core": {
     "bytes": 2873838,
-    "hash": "sha256:91eeb5567cae6ce0040078454a46514aec1b6b282942a15b066b5f827876e9c5"
+    "hash": "sha256:91eeb5567cae6ce0040078454a46514aec1b6b282942a15b066b5f827876e9c5",
+    "bbox": [
+      113.9698,
+      22.239,
+      114.1098,
+      22.325
+    ]
   },
   "hong-kong": {
     "bytes": 2415954,
-    "hash": "sha256:dc4a5b2ffb25c1751934a576f68b9d03a459e167d414a6471be7a3c85ccae9b4"
+    "hash": "sha256:dc4a5b2ffb25c1751934a576f68b9d03a459e167d414a6471be7a3c85ccae9b4",
+    "bbox": [
+      113.8647,
+      22.214,
+      114.214,
+      22.35
+    ]
   },
   "istanbul-core": {
     "bytes": 3119779,
-    "hash": "sha256:ce1d5033a7fe7f7a89988189798befcca3e17ff81ca48b06fc02788158c49acb"
+    "hash": "sha256:ce1d5033a7fe7f7a89988189798befcca3e17ff81ca48b06fc02788158c49acb",
+    "bbox": [
+      28.953,
+      40.9904,
+      28.9984,
+      41.0406
+    ]
   },
   "istanbul": {
     "bytes": 3927219,
-    "hash": "sha256:31cb498cee1ae7516e33253779272df8242b18c5adffe1ff51fabe28b40eb83f"
+    "hash": "sha256:31cb498cee1ae7516e33253779272df8242b18c5adffe1ff51fabe28b40eb83f",
+    "bbox": [
+      28.7119,
+      40.9654,
+      29.0234,
+      41.3153
+    ]
   },
   "kuala-lumpur-core": {
     "bytes": 6715364,
-    "hash": "sha256:f802c3ce7c6791f96824bc6bb476491d9941efb6ce83f74ef80a4392f0713b07"
+    "hash": "sha256:f802c3ce7c6791f96824bc6bb476491d9941efb6ce83f74ef80a4392f0713b07",
+    "bbox": [
+      101.6674,
+      3.1297,
+      101.7266,
+      3.2529
+    ]
   },
   "kuala-lumpur": {
     "bytes": 2445785,
-    "hash": "sha256:ccbcce98eb245c990cb3a6558c5a8c47d1b3432712f3ccc4af94647e75e8ab27"
+    "hash": "sha256:ccbcce98eb245c990cb3a6558c5a8c47d1b3432712f3ccc4af94647e75e8ab27",
+    "bbox": [
+      101.644,
+      2.7056,
+      101.7516,
+      3.2779
+    ]
   },
   "london-core": {
     "bytes": 11652352,
-    "hash": "sha256:a3554eae5456022f79f40030a6019fe3fa2995f882c69479bb021d539cf40182"
+    "hash": "sha256:a3554eae5456022f79f40030a6019fe3fa2995f882c69479bb021d539cf40182",
+    "bbox": [
+      -0.1612,
+      51.4864,
+      -0.0583,
+      51.5565
+    ]
   },
   "london": {
     "bytes": 4205189,
-    "hash": "sha256:cb35f3b3ef3f8c5a1dd9299817630973e41342973c714a1988a04901512636f9"
+    "hash": "sha256:cb35f3b3ef3f8c5a1dd9299817630973e41342973c714a1988a04901512636f9",
+    "bbox": [
+      -0.4943,
+      51.43,
+      -0.0354,
+      51.5815
+    ]
   },
   "maldives-core": {
     "bytes": 873367,
-    "hash": "sha256:20d4f19fa24e6abc542904b70cea4ad5ca409689877f63fdc39636cca259f555"
+    "hash": "sha256:20d4f19fa24e6abc542904b70cea4ad5ca409689877f63fdc39636cca259f555",
+    "bbox": [
+      73.4937999,
+      4.155,
+      73.555,
+      4.2259
+    ]
   },
   "maldives": {
     "bytes": 503917,
-    "hash": "sha256:3e9b8d08b228a96b3292d179dd85de8a0a8066eb346a3868ee84236bc509957e"
+    "hash": "sha256:3e9b8d08b228a96b3292d179dd85de8a0a8066eb346a3868ee84236bc509957e",
+    "bbox": [
+      73.4706,
+      4.13,
+      73.58,
+      4.2505
+    ]
   },
   "paris-core": {
     "bytes": 13001905,
-    "hash": "sha256:959d187d0d595b528b5bd73278a265b5e459739981a64bef43a79457bb137660"
+    "hash": "sha256:959d187d0d595b528b5bd73278a265b5e459739981a64bef43a79457bb137660",
+    "bbox": [
+      2.2787,
+      48.8374,
+      2.3703,
+      48.9017
+    ]
   },
   "paris": {
     "bytes": 5309770,
-    "hash": "sha256:05017798e7934831e1cfb70ac995d5418ec1801f6cc92571a287aa55ac885e51"
+    "hash": "sha256:05017798e7934831e1cfb70ac995d5418ec1801f6cc92571a287aa55ac885e51",
+    "bbox": [
+      2.2537,
+      48.813,
+      2.5879,
+      49.0497
+    ]
   },
   "phuket-core": {
     "bytes": 3688404,
-    "hash": "sha256:bd5ccf152865fb845ed5e42172bc3d7b34ad0adb0f673a808203cb5745ba3c8b"
+    "hash": "sha256:bd5ccf152865fb845ed5e42172bc3d7b34ad0adb0f673a808203cb5745ba3c8b",
+    "bbox": [
+      98.279,
+      7.7598,
+      98.4051,
+      7.8998
+    ]
   },
   "phuket": {
     "bytes": 998164,
-    "hash": "sha256:360d3acdf4c6e314e8463797f913c807be6c8c84e9fecb0de072b40152987754"
+    "hash": "sha256:360d3acdf4c6e314e8463797f913c807be6c8c84e9fecb0de072b40152987754",
+    "bbox": [
+      98.254,
+      7.7219,
+      98.428,
+      8.1532
+    ]
   },
   "prague-core": {
     "bytes": 6168275,
-    "hash": "sha256:d69eae2e34511eabf4df2365333e7f06cfa009328eaed3eea40c9017f21efe71"
+    "hash": "sha256:d69eae2e34511eabf4df2365333e7f06cfa009328eaed3eea40c9017f21efe71",
+    "bbox": [
+      14.3803,
+      50.0663,
+      14.443,
+      50.1071
+    ]
   },
   "prague": {
     "bytes": 3512035,
-    "hash": "sha256:b404f5b7e2c4c54e22c73c5288c9169365e9cec7e021a825fc76a0b49bdef263"
+    "hash": "sha256:b404f5b7e2c4c54e22c73c5288c9169365e9cec7e021a825fc76a0b49bdef263",
+    "bbox": [
+      14.22,
+      50.0413,
+      14.468,
+      50.1408
+    ]
   },
   "rome-core": {
     "bytes": 6779475,
-    "hash": "sha256:b2c907c253838000a74b6e9b45b76b42ee9a01df9eb45d4001bd3974b860d48e"
+    "hash": "sha256:b2c907c253838000a74b6e9b45b76b42ee9a01df9eb45d4001bd3974b860d48e",
+    "bbox": [
+      12.4365,
+      41.8748,
+      12.5166,
+      41.9215
+    ]
   },
   "rome": {
     "bytes": 3120671,
-    "hash": "sha256:52167d5e886975d8b428788944dc0f1543eea2d35211e897ef1e84d637a88d4d"
+    "hash": "sha256:52167d5e886975d8b428788944dc0f1543eea2d35211e897ef1e84d637a88d4d",
+    "bbox": [
+      12.1989,
+      41.7603,
+      12.5416,
+      41.9465
+    ]
   },
   "seoul-core": {
     "bytes": 9193889,
-    "hash": "sha256:ca58467394adb9fe809e161a50602946c764887c643ea5c1c24b5bdd7069c138"
+    "hash": "sha256:ca58467394adb9fe809e161a50602946c764887c643ea5c1c24b5bdd7069c138",
+    "bbox": [
+      126.9086,
+      37.5362,
+      127.0245,
+      37.5976
+    ]
   },
   "seoul": {
     "bytes": 4565574,
-    "hash": "sha256:e381957017baa23432ef0e602a45dd30a4d3b7362ca295f5095d04bddfa3293a"
+    "hash": "sha256:e381957017baa23432ef0e602a45dd30a4d3b7362ca295f5095d04bddfa3293a",
+    "bbox": [
+      126.4007,
+      37.4202,
+      127.0495,
+      37.6226
+    ]
   },
   "singapore-core": {
     "bytes": 9199050,
-    "hash": "sha256:de778ade2e0f93624395906509bfd3f90b2f10c5df3a42f3f67b10a80f8f5c2c"
+    "hash": "sha256:de778ade2e0f93624395906509bfd3f90b2f10c5df3a42f3f67b10a80f8f5c2c",
+    "bbox": [
+      103.778,
+      1.2568999,
+      103.8811,
+      1.3969
+    ]
   },
   "singapore": {
     "bytes": 2298684,
-    "hash": "sha256:cc8455003073793ae1f63aada960c66f7fc27ddef4517ed175822f9f89e1c27d"
+    "hash": "sha256:cc8455003073793ae1f63aada960c66f7fc27ddef4517ed175822f9f89e1c27d",
+    "bbox": [
+      103.753,
+      1.2094,
+      104.0315,
+      1.4443
+    ]
   },
   "sydney-core": {
     "bytes": 6042034,
-    "hash": "sha256:90092fef67b12a6866d882ba56d9d3f12062c7ecae047cdf2b5bd3a44cd46bd8"
+    "hash": "sha256:90092fef67b12a6866d882ba56d9d3f12062c7ecae047cdf2b5bd3a44cd46bd8",
+    "bbox": [
+      151.1836999,
+      -33.9065,
+      151.2917,
+      -33.8283
+    ]
   },
   "sydney": {
     "bytes": 1818691,
-    "hash": "sha256:cadd931c9019c1861bcd975e1475f01d7594f0c3f6eaf9f18954ec710e068d1c"
+    "hash": "sha256:cadd931c9019c1861bcd975e1475f01d7594f0c3f6eaf9f18954ec710e068d1c",
+    "bbox": [
+      151.1353,
+      -33.9799,
+      151.3167,
+      -33.8033
+    ]
   },
   "tokyo-core": {
     "bytes": 19719275,
-    "hash": "sha256:4978c12b0115d0e694f4f1ba5670a0d0bcb68dcde062d3971ef6b18334d88684"
+    "hash": "sha256:4978c12b0115d0e694f4f1ba5670a0d0bcb68dcde062d3971ef6b18334d88684",
+    "bbox": [
+      139.685,
+      35.6426,
+      139.825,
+      35.7318
+    ]
   },
   "tokyo": {
     "bytes": 3053065,
-    "hash": "sha256:d0d7ee375e26386deead686beda2e3ff623dab0b307074c9270ee842d876b163"
+    "hash": "sha256:d0d7ee375e26386deead686beda2e3ff623dab0b307074c9270ee842d876b163",
+    "bbox": [
+      139.6593,
+      35.5094,
+      139.8507,
+      35.7548
+    ]
   },
   "vienna-core": {
     "bytes": 11586299,
-    "hash": "sha256:f2e0645595dff0404ae64c7185e6554760cbe295a507e7b8928a79ffbe830ea8"
+    "hash": "sha256:f2e0645595dff0404ae64c7185e6554760cbe295a507e7b8928a79ffbe830ea8",
+    "bbox": [
+      16.2969,
+      48.1695,
+      16.4109,
+      48.2316
+    ]
   },
   "vienna": {
     "bytes": 3342869,
-    "hash": "sha256:9134430573ce20f3d56b6dc2cffcea53a7e13a97e3062e4e95d82b80a912f790"
+    "hash": "sha256:9134430573ce20f3d56b6dc2cffcea53a7e13a97e3062e4e95d82b80a912f790",
+    "bbox": [
+      16.2722,
+      48.0703,
+      16.6097,
+      48.2566
+    ]
   },
   "zurich-core": {
     "bytes": 6774392,
-    "hash": "sha256:067f2ff91eca9b8bdf352a4ed8d3335455e04057334ac4cd5841595700ebd7ba"
+    "hash": "sha256:067f2ff91eca9b8bdf352a4ed8d3335455e04057334ac4cd5841595700ebd7ba",
+    "bbox": [
+      8.4766,
+      47.3348,
+      8.5573,
+      47.3929
+    ]
   },
   "zurich": {
     "bytes": 2456847,
-    "hash": "sha256:df05301b6656264cbc978789970185a4b4c0bc09c31d3a7082b0cc6e5006cc25"
+    "hash": "sha256:df05301b6656264cbc978789970185a4b4c0bc09c31d3a7082b0cc6e5006cc25",
+    "bbox": [
+      8.4515999,
+      47.3098,
+      8.5892,
+      47.5047
+    ]
   }
 }

@@ -47,7 +47,8 @@ const fs=require("fs"),crypto=require("crypto");
 const dir="public/tiles",m={};
 for (const f of fs.readdirSync(dir).filter(f=>f.endsWith(".pmtiles"))) {
   const buf=fs.readFileSync(`${dir}/${f}`);
-  m[f.replace(".pmtiles","")]={bytes:buf.length,hash:"sha256:"+crypto.createHash("sha256").update(buf).digest("hex")};
+  // bounds from the PMTiles v3 header (int32 x 1e-7 at byte 102): stored here so the server never has to open the big files
+  m[f.replace(".pmtiles","")]={bytes:buf.length,hash:"sha256:"+crypto.createHash("sha256").update(buf).digest("hex"),bbox:[buf.readInt32LE(102)/1e7,buf.readInt32LE(106)/1e7,buf.readInt32LE(110)/1e7,buf.readInt32LE(114)/1e7]};
 }
 fs.writeFileSync(`${dir}/manifest.json`,JSON.stringify(m,null,2));
 console.log("wrote",dir+"/manifest.json",Object.keys(m).length,"files");'

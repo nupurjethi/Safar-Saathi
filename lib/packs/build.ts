@@ -31,6 +31,8 @@ function readTilesManifest(): TilesManifest {
 
 /** Bounds from the PMTiles v3 header (min lon, min lat, max lon, max lat as int32 x 1e-7 at byte 102). */
 function coreBbox(slug: string): [number, number, number, number] {
+  const known = readTilesManifest()[`${slug}-core`]?.bbox; // written by scripts/build-tiles.sh; lets a serverless host skip opening the tile file
+  if (known) return known;
   const fd = fs.openSync(path.join(process.cwd(), "public", "tiles", `${slug}-core.pmtiles`), "r");
   try {
     const b = Buffer.alloc(127);

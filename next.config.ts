@@ -28,6 +28,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   // PGlite (local dev database when DATABASE_URL is empty) ships WASM + uses fs.
+  // Files read with fs at runtime (pack builder, offline-size estimate): a serverless host only ships what it can trace, so list them.
+  outputFileTracingIncludes: { "/**/*": ["./public/tiles/manifest.json", "./lib/seed/route-cache.json", "./public/places/**/*", "./public/map/**/*"] },
   serverExternalPackages: ["@electric-sql/pglite", "ws"],
   turbopack: {
     rules: {
