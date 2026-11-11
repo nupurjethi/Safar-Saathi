@@ -493,3 +493,27 @@ test("13. offline: every trip page opens, switching between the Trip agent and t
   }
   await context.setOffline(false);
 });
+
+test("14. My trips: delete a trip (with a confirmation), and the others stay", async ({ page }) => {
+  await loginAs(page, "traveller", "/explore");
+  await page.getByTestId("itinerary-card").first().click();
+  await page.getByTestId("select-btn").click();
+  await expect(page.getByTestId("offline-ready")).toHaveText("Offline guide ready", { timeout: 60_000 });
+  const ref = (await page.getByText(/^SS-\d{5}$/).first().innerText()).trim();
+  await page.goto("/trips");
+  const card = page.locator('[data-testid="trip-card"]', { hasText: ref });
+  await expect(card).toBeVisible();
+  const before = await page.getByTestId("trip-card").count();
+  await page.locator("li", { has: card }).getByTestId("delete-trip").click();
+  await expect(page.getByTestId("delete-dialog")).toContainText(ref);
+  await page.getByTestId("delete-cancel").click(); // keeping it works
+  await expect(card).toBeVisible();
+  await page.locator("li", { has: card }).getByTestId("delete-trip").click();
+  await page.getByTestId("delete-confirm").click();
+  await expect(page.locator('[data-testid="trip-card"]', { hasText: ref })).toHaveCount(0);
+  expect(await page.getByTestId("trip-card").count()).toBe(before - 1);
+  expect((await page.request.get(`/api/mock/v1/bookings/${ref}`)).status()).toBe(404);
+  await page.reload(); // gone from the server too
+  await expect(page.locator('[data-testid="trip-card"]', { hasText: ref })).toHaveCount(0);
+  await expect(page.locator('[data-testid="trip-card"]', { hasText: "SS-48213" })).toBeVisible();
+});
