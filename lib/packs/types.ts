@@ -4,7 +4,7 @@ import type { RulesMeta } from "@/lib/rules/generate";
 import type { RuleSetIn } from "@/lib/rules/schema";
 
 /** A real, openly licensed photo of a real landmark, saved with the trip so it shows offline. */
-export type PlaceImageRef = { src: string; title: string; author: string; license: string; licenseUrl: string; sourceUrl: string };
+export type PlaceImageRef = { src: string; title: string; author: string; license: string; licenseUrl: string; sourceUrl: string; /** set for photos stored in the database (uploaded plans): size and hash for the offline manifest */ bytes?: number; sha256?: string };
 
 export type PackPlace = {
   id: string;

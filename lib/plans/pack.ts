@@ -57,7 +57,7 @@ export async function buildPlanPackContent(b: typeof s.bookings.$inferSelect, db
     places[`airport_${iata}`] = { id: `airport_${iata}`, kind: "airport", city: a.citySlug ?? "home", name: a.name, name_local: a.name, address: a.name, address_local: a.name, lat: a.lat, lon: a.lon };
   }
   for (const c of cities) {
-    places[`city_${c.slug}`] = { id: `city_${c.slug}`, kind: "poi", city: c.slug, name: `${c.name} centre`, name_local: `${c.name} centre`, address: `${c.name}, ${c.country}`, address_local: `${c.name}, ${c.country}`, lat: c.lat, lon: c.lon };
+    places[`city_${c.slug}`] = { id: `city_${c.slug}`, kind: "poi", city: c.slug, name: `${c.name} centre`, name_local: `${c.name} centre`, address: `${c.name}, ${c.country}`, address_local: `${c.name}, ${c.country}`, lat: c.lat, lon: c.lon , ...(p.photos?.[`city:${c.slug}`] ? { image: p.photos[`city:${c.slug}`] } : {}) };
   }
   const hotelItems = items.filter((i) => i.kind === "hotel").sort((x, y) => String(x.details.checkinDate).localeCompare(String(y.details.checkinDate)));
   hotelItems.forEach((h, i) => {
@@ -68,7 +68,7 @@ export async function buildPlanPackContent(b: typeof s.bookings.$inferSelect, db
   const poiId = new Map<string, string>();
   for (const [k, g] of Object.entries(p.geo.places)) {
     const id = `poi_${Object.keys(places).length}`;
-    places[id] = { id, kind: "poi", city: g.citySlug, name: g.name, name_local: g.name, address: g.name, address_local: g.name, lat: g.lat, lon: g.lon };
+    places[id] = { id, kind: "poi", city: g.citySlug, name: g.name, name_local: g.name, address: g.name, address_local: g.name, lat: g.lat, lon: g.lon , ...(p.photos?.[`place:${k}`] ? { image: p.photos[`place:${k}`] } : {}) };
     poiId.set(k, id);
   }
 

@@ -337,6 +337,17 @@ export const mapTiles = pgTable("map_tiles", {
   updatedAt: updatedAt(),
 });
 
+/** Openly licensed photos found for places in uploaded plans (Wikimedia Commons), stored so trips carry them offline. */
+export const placePhotos = pgTable("place_photos", {
+  id: id(),
+  key: varchar("key", { length: 80 }).notNull().unique(),
+  mime: varchar("mime", { length: 40 }).notNull(),
+  bytes: integer("bytes").notNull(),
+  sha256: text("sha256").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: createdAt(),
+});
+
 /** Which booking platforms a traveller says they are logged in to (self-declared; we never see their account or password). */
 export const providerConnections = pgTable(
   "provider_connections",

@@ -9,6 +9,9 @@ import { extractPlan, PLAN_PROMPT_VERSION } from "./extract";
 import { geocodeAirport, geocodeCity, geocodePlace, KNOWN_AIRPORTS, matchDestination, type LatLon } from "./geo";
 import { validTz, type Plan } from "./schema";
 import { extractTiles } from "@/lib/map/extract-tiles";
+import { createHash } from "node:crypto";
+import type { PlaceImageRef } from "@/lib/packs/types";
+import { findPhoto, seededPhoto } from "./photos";
 
 /** What is stored for a processed plan: the model's extraction plus the geography we resolved for it. */
 export type StoredPlan = Plan & {
@@ -20,6 +23,9 @@ export type StoredPlan = Plan & {
   };
   airportTz: Record<string, string>;
   routeCache?: Record<string, CachedRoute>;
+  /** real, openly licensed photos: `city:<slug>` and `place:<name>|<city>` (lower-case) */
+  photos?: Record<string, PlaceImageRef>;
+  hero?: PlaceImageRef;
   promptVersion: string;
 };
 
@@ -132,8 +138,32 @@ export async function processPlan(planId: string, userId: string, step: Step = (
     }
   }
 
+  // real photos for the trip cards and pages: our own landmark photos first, then Wikimedia Commons (licence-checked)
+  step("Finding photos of your places");
+  const photos: Record<string, PlaceImageRef> = {};
+  let lookups2 = 0;
+  const keep = async (name: string, found: Awaited<ReturnType<typeof findPhoto>>): Promise<PlaceImageRef | null> => {
+    if (!found) return null;
+    const key = `plan-${planId.slice(0, 8)}-${createHash("sha1").update(name).digest("hex").slice(0, 10)}`;
+    await db.insert(s.placePhotos).values({ key, mime: found.mime, bytes: found.data.length, sha256: found.sha256, data: found.data }).onConflictDoNothing();
+    return { src: `/places/u/${key}.${found.mime === "image/png" ? "png" : "jpg"}`, ...found.credit, bytes: found.data.length, sha256: found.sha256 };
+  };
+  for (const c of p.cities) {
+    const slug = geo.citySlug[c.name.toLowerCase()], centre = geo.cities[slug];
+    let ph = seededPhoto(c.name);
+    if (!ph && lookups2 < 8) { lookups2++; ph = await keep(`city-${slug}`, await findPhoto(c.name, centre, { exactTitle: true })); }
+    if (ph) photos[`city:${slug}`] = ph;
+  }
+  for (const [k, g] of Object.entries(geo.places)) {
+    const cityName = p.cities.find((c) => geo.citySlug[c.name.toLowerCase()] === g.citySlug)?.name ?? "";
+    let ph = seededPhoto(cityName, g.name);
+    if (!ph && lookups2 < 10) { lookups2++; ph = await keep(`place-${k}`, await findPhoto(`${g.name} ${cityName}`, g)); }
+    if (ph) photos[`place:${k}`] = ph;
+  }
+  const hero = Object.values(photos)[0];
+
   step("Creating your trip");
-  const stored: StoredPlan = { ...p, geo, airportTz, promptVersion: PLAN_PROMPT_VERSION };
+  const stored: StoredPlan = { ...p, geo, airportTz, photos, hero, promptVersion: PLAN_PROMPT_VERSION };
   const ref = await freeRef(db);
   const flightItems = p.flights.map((f, i) => {
     const [dd, dt] = f.departLocal.split("T"), [ad, at] = f.arriveLocal.split("T");

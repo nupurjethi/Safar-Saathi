@@ -225,6 +225,7 @@ export function buildManifest(pack: OfflinePack, bookingId: string, packBytes: n
   }
   for (const place of Object.values(pack.places)) {
     if (!place.image) continue;
+    if (place.image.bytes && place.image.sha256) { files.push({ url: place.image.src, kind: "image", bytes: place.image.bytes, hash: place.image.sha256 }); continue; } // stored in the database (uploaded plans)
     try {
       const buf = fs.readFileSync(path.join(process.cwd(), "public", place.image.src));
       files.push({ url: place.image.src, kind: "image", bytes: buf.length, hash: sha256(buf) });

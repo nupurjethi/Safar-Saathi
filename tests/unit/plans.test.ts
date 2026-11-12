@@ -15,6 +15,7 @@ import { setupDb, BASE_DATE } from "./helpers";
 
 process.env.PLAN_GEOCODER = "off"; // tests use our own seeded geography only (no network)
 process.env.PLAN_ROUTING = "off";
+process.env.PLAN_PHOTOS = "off"; // tests reuse only our own seeded photos (no network)
 
 // A tiny but real PDF with one line of text
 const PDF = Buffer.from(`%PDF-1.4
@@ -137,6 +138,13 @@ describe("Add travel plan agent: documents -> trip -> full offline bundle", () =
     expect(hotel.name).toBe("Rove Downtown");
     expect(pack.places.airport_DXB.lat).toBeCloseTo(25.2532, 3);
     expect(Object.values(pack.places).some((p) => p.name === "Burj Khalifa" && Math.abs(p.lat - 25.197) < 0.01)).toBe(true);
+    // trip cards and pages have real photos: seeded landmark/city photos are reused, with credits
+    const burj = Object.values(pack.places).find((p) => p.name === "Burj Khalifa")!;
+    expect(burj.image?.src).toMatch(/^\/places\/dubai\//);
+    expect(burj.image?.license).toBeTruthy();
+    expect(pack.places.city_dubai.image?.src).toMatch(/^\/places\/dubai\//);
+    const [pl2] = await db.select().from(s.travelPlans).where(eq(s.travelPlans.bookingId, b.id));
+    expect((pl2.extracted as { hero?: { src: string } }).hero?.src).toMatch(/^\/places\/dubai\//);
     // Dubai is one of our cities: the real offline street map tiles are reused
     expect(pack.map.cities[0].pmtiles).toMatch(/dubai\.pmtiles$/);
     // day plan covers every day with the documents' items
